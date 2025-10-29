@@ -1,6 +1,5 @@
 import Image from "next/image";
-
-import { supabase } from "@/lib/supabaseClient";
+import GitHubSignInButton from "@/components/GitHubSignInButton";
 
 export default function Home() {
   return (
@@ -60,6 +59,7 @@ export default function Home() {
           >
             Documentation
           </a>
+          <GitHubSignInButton />
         </div>
       </main>
     </div>
