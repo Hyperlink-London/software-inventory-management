@@ -1,191 +1,159 @@
-import React, { useState, useRef } from 'react';
-import { Check, ChevronsUpDown, X, PlusCircle, Loader2 } from 'lucide-react';
+// /components/TagSelector/TagSelector.tsx (Refactored)
 
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Command, CommandInput, CommandEmpty, CommandGroup, CommandItem } from "@/components/ui/command";
-import { Separator } from "@/components/ui/separator";
-import { useTagsData } from '@/hooks/useTagsData'; 
+'use client';
 
+import * as React from 'react';
+import { X, Check, Tag } from 'lucide-react';
+import { useTagSelector, TagOption } from '@/hooks/useTagSelector';
+import { cn } from '@/lib/utils';
 
+// Import shadcn components
+import { Badge } from '@/components/ui/badge';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+  CommandSeparator
+} from '@/components/ui/command';
+import { Button } from '@/components/ui/button';
+
+// --- Component Props ---
 
 interface TagSelectorProps {
-    selectedTagIds: string[];
-    onTagChange: (tagIds: string[]) => void;
+  /** The current array of selected tag IDs (strings) from the parent state. */
+  selectedTagIds: string[];
+  /** Callback to update the parent state with the new array of tag IDs. */
+  onTagChange: (newTags: string[]) => void;
+  /** The full list of available TagOption objects queried from Supabase. */
+  availableTags: TagOption[]; // NEW PROP
+  /** Placeholder text for the input field. */
+  placeholder?: string;
+  /** Label for the input section (optional). */
+  label?: string;
 }
 
-/**
- * A multi-select component for selecting and displaying tags using Shadcn UI components.
- */
-export function TagSelector({ selectedTagIds, onTagChange }: TagSelectorProps) {
-    // Fetches all available tags and their loading state
-    const { tags, loading } = useTagsData(); 
-    
-    const [open, setOpen] = useState(false);
-    const [search, setSearch] = useState('');
-    const triggerRef = useRef<HTMLButtonElement>(null);
+// --- Component ---
 
-    // Derived state for easy filtering
-    const selectedTags = tags.filter(tag => selectedTagIds.includes(tag.id));
-    const availableTags = tags.filter(tag => !selectedTagIds.includes(tag.id));
+export const TagSelector: React.FC<TagSelectorProps> = ({
+  selectedTagIds,
+  onTagChange,
+  availableTags,
+  placeholder = 'Search or create a tag...',
+  label = 'Tags',
+}) => {
+  const [open, setOpen] = React.useState(false);
 
-    const handleSelect = (tagId: string) => {
-        const isSelected = selectedTagIds.includes(tagId);
-        let newSelection: string[];
+  const {
+    inputValue,
+    selectedTagNames,
+    setInputValue,
+    addTag,
+    removeTag,
+    filteredOptions,
+    canCreateTag,
+  } = useTagSelector(selectedTagIds, availableTags, onTagChange);
 
-        if (isSelected) {
-            // Deselect: remove tagId
-            newSelection = selectedTagIds.filter(id => id !== tagId);
-        } else {
-            // Select: add tagId
-            newSelection = [...selectedTagIds, tagId];
-        }
-        onTagChange(newSelection);
-        setSearch(''); 
-        
-        // Return focus to the trigger button after selection
-        setTimeout(() => triggerRef.current?.focus(), 0);
-    };
+  // Handle a click on a command item (either existing or new)
+  const handleItemSelect = React.useCallback((tagName: string) => {
+    addTag(tagName);
+    setOpen(false); // Close the popover after selection
+  }, [addTag]);
 
-    const handleRemoveTag = (e: React.MouseEvent, tagId: string) => {
-        e.stopPropagation(); // Prevents the popover from toggling
-        handleSelect(tagId);
-    };
+  return (
+    <div className="space-y-2">
+      {label && <label className="text-sm font-medium leading-none">{label}</label>}
 
-    const handleTogglePopover = () => {
-        setOpen(current => !current);
-        if (!open) setSearch(''); // Clear search when opening
-    };
+      {/* Selected Tags Display */}
+      <div className="flex flex-wrap gap-2 min-h-[1.5rem] items-start pb-1">
+        {selectedTagNames.length === 0 ? (
+          <p className="text-sm text-muted-foreground pt-1">No tags selected.</p>
+        ) : (
+          selectedTagNames.map((tag) => (
+            <Badge 
+              key={tag} 
+              variant="secondary" 
+              className="py-1 pr-1.5 pl-3 text-sm transition-colors"
+            >
+              {tag}
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="ml-1 h-4 w-4 rounded-full p-0.5 hover:bg-transparent text-foreground/70 hover:text-red-500"
+                onClick={() => {
+                  // Find the ID corresponding to the name to remove the correct ID
+                  const tagToRemove = availableTags.find(t => t.name === tag);
+                  removeTag(tagToRemove ? tagToRemove.id : tag); 
+                }}
+              >
+                <X className="h-3 w-3" />
+              </Button>
+            </Badge>
+          ))
+        )}
+      </div>
 
-    // Filter tags to display in the dropdown list
-    const filteredAvailableTags = availableTags.filter(tag =>
-        tag.name.toLowerCase().includes(search.toLowerCase())
-    );
-    
-    // Filter selected tags for quick deselection if the search bar is used
-    const filteredSelectedTags = selectedTags.filter(tag =>
-        tag.name.toLowerCase().includes(search.toLowerCase())
-    );
+      {/* Popover/Command Menu for Selection */}
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <Button
+            variant="outline"
+            role="combobox"
+            aria-expanded={open}
+            className="w-full justify-start text-left font-normal h-10 text-muted-foreground"
+          >
+             <Tag className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+            {placeholder}
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+          <Command shouldFilter={false}>
+            <CommandInput
+              placeholder={placeholder}
+              value={inputValue}
+              onValueChange={setInputValue}
+            />
+            <CommandList>
+              <CommandEmpty>No tags found.</CommandEmpty>
 
+              {/* Option to create a new tag */}
+              {canCreateTag && (
+                <CommandItem
+                  onSelect={() => handleItemSelect(inputValue)}
+                  className="text-primary font-medium"
+                >
+                  <Check className="mr-2 h-4 w-4 opacity-0" />
+                  Create new tag: **"{inputValue.trim()}"**
+                </CommandItem>
+              )}
+              {canCreateTag && <CommandSeparator />}
 
-    return (
-        <div className="flex flex-col space-y-2 w-full">
-            <Label>Tags</Label>
-            <Popover open={open} onOpenChange={setOpen}>
-                <PopoverTrigger asChild>
-                    <Button
-                        variant="outline"
-                        role="combobox"
-                        ref={triggerRef}
-                        aria-expanded={open}
-                        className="w-full justify-between h-auto min-h-[40px] p-1 pr-3 shadow-sm"
-                        disabled={loading}
-                        onClick={handleTogglePopover} // Explicitly handle toggle
-                    >
-                        {loading ? (
-                             <span className="text-slate-500 font-normal ml-2 flex items-center">
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading tags...
-                             </span>
-                        ) : selectedTags.length > 0 ? (
-                            <div className="flex flex-wrap gap-1 items-center py-1">
-                                {selectedTags.map(tag => (
-                                    <Badge 
-                                        key={tag.id} 
-                                        className="bg-blue-600 hover:bg-blue-700 text-black flex items-center gap-2 transition-colors"
-                                    >
-                                        {tag.name}
-                                        {/* X icon is removed */}
-                                    </Badge>
-                                ))}
-                            </div>
-                        ) : (
-                            <span className="text-slate-500 font-normal ml-2">Select tags...</span>
-                        )}
-                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                    </Button>
-                </PopoverTrigger>
-
-                <PopoverContent 
-                    align="start" 
-                    className='w-[--radix-popover-trigger-width] p-0 z-50 bg-white'
-                > 
-                    <Command>
-                        {/* FIX 1: Reduced CommandInput size and padding (h-8 and pl-2) */}
-                        <CommandInput 
-                            placeholder="Search tags..." 
-                            value={search} 
-                            onValueChange={setSearch}
-                            className="flex h-8 w-full rounded-md border-b border-input bg-transparent py-1 pl-2 pr-2 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-                        />
-                        
-                        <CommandEmpty>
-                            {loading ? "Loading tags..." : `No tags found matching "${search}".`}
-                        </CommandEmpty>
-                        
-                        {!loading && (
-                            <div className="max-h-60 overflow-y-auto">
-                                {/* FIX 3: Removed custom padding from CommandGroup */}
-                                {filteredSelectedTags.length > 0 && (
-                                    <CommandGroup heading="Selected"> 
-                                        {filteredSelectedTags.map(tag => (
-                                            <CommandItem
-                                                key={tag.id}
-                                                value={tag.name} 
-                                                onSelect={() => handleSelect(tag.id)}
-                                                // FIX 2: Explicitly set py-1 for tighter vertical spacing
-                                                className="relative flex cursor-default select-none items-center rounded-sm px-2 py-1 text-sm outline-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50"
-                                            >
-                                                <Check className="mr-2 h-4 w-4 text-blue-600" />
-                                                {tag.name}
-                                            </CommandItem>
-                                        ))}
-                                    </CommandGroup>
-                                )}
-
-                                {/* FIX 3: Removed custom padding from CommandGroup */}
-                                {filteredAvailableTags.length > 0 && (
-                                    <CommandGroup heading="Available Tags">
-                                        {filteredAvailableTags.map(tag => (
-                                            <CommandItem
-                                                key={tag.id}
-                                                value={tag.name} 
-                                                onSelect={() => handleSelect(tag.id)}
-                                                // FIX 2: Explicitly set py-1 for tighter vertical spacing
-                                                className="relative flex cursor-default select-none items-center rounded-sm px-2 py-1 text-sm outline-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50"
-                                            >
-                                                {/* Checkmark is removed for unselected tags */}
-                                                <div className="mr-2 h-4 w-4" /> 
-                                                {tag.name}
-                                            </CommandItem>
-                                        ))}
-                                    </CommandGroup>
-                                )}
-                                
-                                {/* "Add New Tag" Option Placeholder */}
-                                {search && (
-                                    <CommandGroup>
-                                        <Separator />
-                                        {/* FIX 2: Explicitly set py-1 for tighter vertical spacing */}
-                                        <CommandItem
-                                            onSelect={() => {
-                                                console.log(`ACTION: Prompt to add new tag: "${search}"`);
-                                                setOpen(false);
-                                                // TODO: Implement logic to create a new tag and add its ID to the selection
-                                            }}
-                                            className="justify-center text-blue-600 hover:text-blue-800 relative flex cursor-default select-none items-center rounded-sm px-2 py-1 text-sm outline-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50"
-                                        >
-                                            <PlusCircle className="mr-2 h-4 w-4" />
-                                            Add New Tag: "{search}"
-                                        </CommandItem>
-                                    </CommandGroup>
-                                )}
-                            </div>
-                        )}
-                    </Command>
-                </PopoverContent>
-            </Popover>
-        </div>
-    );
-}
+              {/* Available Tag Options */}
+              <CommandGroup heading="Available Tags">
+                {filteredOptions.map((tag) => (
+                  <CommandItem
+                    key={tag.id}
+                    value={tag.name}
+                    onSelect={() => handleItemSelect(tag.name)}
+                  >
+                    <Check
+                      className={cn(
+                        'mr-2 h-4 w-4',
+                        selectedTagIds.includes(tag.id) ? 'opacity-100' : 'opacity-0'
+                      )}
+                    />
+                    {tag.name}
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            </CommandList>
+          </Command>
+        </PopoverContent>
+      </Popover>
+    </div>
+  );
+};

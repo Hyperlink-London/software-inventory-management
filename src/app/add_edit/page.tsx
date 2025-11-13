@@ -1,26 +1,38 @@
 'use client'
 
 import { supabase } from "@/lib/supabaseClient"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
 import {
   Card,
-  CardHeader,
-  CardTitle,
-  CardDescription,
   CardContent,
   CardFooter,
 } from "@/components/ui/card"
 
-// NOTE: useTagsData is no longer needed directly in the parent component
-// but we leave the import here for consistency if it's used elsewhere.
-import { useTagsData } from "@/hooks/useTagsData" 
-import { TagSelector } from '@/components/TagSelector'; // The component that was giving errors
+import { TagSelector } from '@/components/TagSelector';
+import { TagOption } from '@/hooks/useTagSelector';
 
-// 1. UPDATED TYPE: Use an array for tags
+/**
+ * Fetches all tags from the Supabase 'tags' table.
+ * @returns {Promise<TagOption[]>}
+ */
+const fetchAllTags = async (): Promise<TagOption[]> => {
+    // Actual Supabase call:
+    // Ensure your 'tags' table has 'id' (UUID/Text) and 'name' (Text) columns
+    const { data, error } = await supabase.from('tags').select('id, name');
+    
+    if (error) {
+        console.error("Error fetching tags:", error);
+        throw error;
+    }
+    // Supabase returns an array of objects matching the {id: string, name: string} format
+    return data as TagOption[]; 
+};
+
+
 type ItemData = {
   name: string
   image?: File | null
@@ -36,14 +48,29 @@ export default function AddItemPage() {
     image: null,
     notes: "",
     quantity: 0,
-    tags: [], // Initialize as an empty array
+    tags: [],
   })
 
-  // We don't need 'tags' or 'loading' state here since TagSelector handles it internally
-  // But we keep the hook call if 'loading' is used elsewhere in the page (it wasn't in your original combobox)
-  const { loading } = useTagsData() 
-  
-  // Removed unused 'open' state
+  const [availableTags, setAvailableTags] = useState<TagOption[]>([]);
+  const [isLoadingTags, setIsLoadingTags] = useState(true);
+
+  useEffect(() => {
+        const loadTags = async () => {
+            try {
+                setIsLoadingTags(true);
+                const data = await fetchAllTags();
+                setAvailableTags(data);
+            } catch (error) {
+                console.error("Failed to load available tags:", error);
+                // Optionally handle error state here
+            } finally {
+                setIsLoadingTags(false);
+            }
+        };
+
+        loadTags();
+    }, []);
+
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
@@ -74,7 +101,6 @@ export default function AddItemPage() {
       tags: newTagIds,
     }))
   }
-  // Removed old handleTagSelect function
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -92,12 +118,6 @@ export default function AddItemPage() {
       </p>
 
       <Card className="border-zinc-200 dark:border-zinc-800">
-        <CardHeader>
-          <CardTitle>Add Component</CardTitle>
-          <CardDescription>
-            Enter item details, upload an image, and specify quantity.
-          </CardDescription>
-        </CardHeader>
 
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -130,6 +150,7 @@ export default function AddItemPage() {
             <TagSelector 
                 selectedTagIds={formData.tags} // Pass the array of selected IDs
                 onTagChange={handleTagsChange} // Pass the handler to update the array
+                availableTags={availableTags}
             />
 
             {/* Notes */}
@@ -159,7 +180,7 @@ export default function AddItemPage() {
 
             <CardFooter className="px-0">
               <Button type="submit" className="w-full">
-                Add Component
+                Add Item
               </Button>
             </CardFooter>
           </form>
