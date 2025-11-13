@@ -1,29 +1,36 @@
-"use client";
+"use client"
 
-import { useCallback } from "react";
-import { createClient } from "@/utils/supabase/client";
+import { supabase } from "@/lib/supabaseClient"
+import { Github } from 'lucide-react';
 
-export default function GitHubSignInButton() {
-  const handleSignIn = useCallback(async () => {
-    const supabase = createClient();
-    const redirectTo = typeof window !== "undefined" ? `${window.location.origin}` : undefined;
-    await supabase.auth.signInWithOAuth({
-      provider: "github",
-      options: {
-        redirectTo,
-      },
-    });
-  }, []);
+export default function GithubSignInButton() {
+  const handleGithubLogin = async () => {
+    // initiate GitHub OAuth login flow
+    const { error } = await supabase.auth.signInWithOAuth({ provider: "github" })
+    if (error) {
+      console.error("GitHub sign-in error:", error);
+      
+      alert("Could not start the GitHub login process. See console for details.");
+    }
+  }
 
+  // html button to trigger GitHub login
   return (
     <button
-      type="button"
-      onClick={handleSignIn}
-      className="flex h-12 w-full items-center justify-center gap-2 rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[200px]"
+        onClick={handleGithubLogin}
+        className="
+          inline-flex items-center justify-center gap-2
+          whitespace-nowrap rounded-lg text-base font-semibold
+          ring-offset-background transition-colors 
+          focus-visible:outline-none focus-visible:ring-2 
+          focus-visible:ring-offset-2 focus-visible:ring-[#24292F]
+          h-10 px-6 py-2 
+          bg-[#24292F] hover:bg-[#1f2327] 
+          text-white shadow-lg
+        "
     >
-      <span>Sign in with GitHub</span>
+        <Github className="h-5 w-5" />
+        Sign in with GitHub
     </button>
-  );
+  )
 }
-
-
