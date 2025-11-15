@@ -1,6 +1,18 @@
 import Link from "next/link";
+import { supabase } from "../lib/supabaseClient";
+import { redirect } from "next/navigation";
 
-export default function Home() {
+export default async function Home() {  
+
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+
+  if (!session) {
+    redirect("/login");
+  }
+
+
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-semibold text-zinc-900 dark:text-zinc-100">Dashboard</h1>
