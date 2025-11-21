@@ -12,6 +12,7 @@ import {
   CardFooter,
 } from "@/components/ui/card"
 
+import { useAuth } from "@/hooks/useAuth"
 import { TagSelector } from '@/components/TagSelector';
 import { TagOption } from '@/hooks/useTagSelector';
 
@@ -106,6 +107,90 @@ export default function AddItemPage() {
     e.preventDefault()
     console.log("Submitting form:", formData)
     // TODO: Add Supabase insertion logic here
+
+    // image upload logic
+    let image_URL = null;
+    if (formData.image) {
+      const fileName = `${crypto.randomUUID()}-${formData.image.name}`;
+
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from("item-images")
+        .upload(fileName, formData.image);
+
+      if (uploadError) {
+        console.error("Image upload failed:", uploadError);
+        return;
+      }
+
+      // Get public URL
+      const { data: urlData } = supabase.storage
+        .from("item-images")
+        .getPublicUrl(uploadData.path);
+
+      image_URL = urlData.publicUrl;
+    }
+
+    // ============================
+    // 2️⃣ Insert into items table
+    // ============================
+    const { data: itemData, error: itemError } = await supabase
+      .from("items")
+      .insert([
+        {
+          item_name: formData.name,
+          quantity: formData.quantity,
+          notes: formData.notes,
+          image_URL: image_URL,
+          created_by: null, // Replace with actual user ID if available
+        },
+      ])
+      .select()
+      .single();
+
+
+    // error should be null if insert was successful
+    if (itemError) {
+      console.error("Insert failed:", error)
+    } else {
+      alert("Component inserted successfully!")
+      // reset form data
+      setFormData({
+        name: "",
+        image: null,
+        notes: "",
+        quantity: 0,
+        tags: [],
+      })
+    }
+
+    const { data: itemTagData, error: itemTagError } = await supabase
+      .from("itemtags")
+      .insert(
+        formData.tags.map((tagId) => ({
+          item_id: itemData.id,
+          tag_id: tagId,
+        }))
+      );
+
+    if (itemTagError) {
+      console.error("Inserting item tags failed:", itemTagError);
+    } else {
+      console.log("Item tags inserted:", itemTagData);
+    }
+
+
+    // ============================
+    // 4️⃣ Reset form
+    // ============================
+    alert("Item added successfully!");
+
+    setFormData({
+      name: "",
+      image: null,
+      notes: "",
+      quantity: 0,
+      tags: [],
+    });
   }
 
   return (
