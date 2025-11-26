@@ -49,21 +49,21 @@ export async function middleware(req: NextRequest) {
 
       console.log("📌 Existing profile:", profile); // ✅ log existing profile
 
-      if (!profile) {
-        const username =
-          claims.claims?.user_metadata?.user_name ??
-          claims.claims?.user_metadata?.preferred_username ??
-          `user_${supabaseUid.slice(0, 6)}`;
+      // if (!profile) {
+      //   const username =
+      //     claims.claims?.user_metadata?.user_name ??
+      //     claims.claims?.user_metadata?.preferred_username ??
+      //     `user_${supabaseUid.slice(0, 6)}`;
 
-        console.log("➕ Inserting new profile for:", username); // ✅ log insertion
+      //   console.log("➕ Inserting new profile for:", username); // ✅ log insertion
 
-        await supabase.from("profiles").insert({
-          supabase_uid: supabaseUid,
-          username,
-          admin: false,
-          deleted_at: null,
-        });
-      }
+      //   await supabase.from("profiles").insert({
+      //     supabase_uid: supabaseUid,
+      //     username,
+      //     admin: false,
+      //     deleted_at: null,
+      //   });
+      // }
     }
   }
 
