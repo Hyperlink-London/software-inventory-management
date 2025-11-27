@@ -5,8 +5,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
-import { useAuth } from "@/hooks/useAuth";
-import GithubSignInButton from '@/components/GitHubSignInButton';
+import { UserProvider } from "@/contexts/UserContext";
 
 // Note: Fonts/Metadata definition should ideally stay outside the client component
 // but must be included here since the whole layout is now client-side.
@@ -70,9 +69,11 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
+        <UserProvider>
         <Navbar />
         <main className="mx-auto w-full max-w-6xl px-4 py-8">{content}</main>
         <Footer />
+        </UserProvider>
       </body>
     </html>
   );
