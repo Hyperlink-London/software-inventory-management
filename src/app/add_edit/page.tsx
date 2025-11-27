@@ -12,7 +12,6 @@ import {
   CardFooter,
 } from "@/components/ui/card"
 
-import { useAuth } from "@/hooks/useAuth"
 import { TagSelector } from '@/components/TagSelector';
 import { TagOption } from '@/hooks/useTagSelector';
 
