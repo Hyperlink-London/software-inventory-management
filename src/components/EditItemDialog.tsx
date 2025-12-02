@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/dialog";
 import { TagSelector } from "@/components/TagSelector";
 import { TagOption } from "@/hooks/useTagSelector";
-import { Trash2 } from "lucide-react";
+import { Trash2, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 
 /**
@@ -75,6 +75,7 @@ export function EditItemDialog({ open, onOpenChange, item, onSuccess }: EditItem
   const [isLoadingTags, setIsLoadingTags] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
   // Load item data when dialog opens
   useEffect(() => {
@@ -120,6 +121,7 @@ export function EditItemDialog({ open, onOpenChange, item, onSuccess }: EditItem
         tags: [],
         existingImageUrl: null,
       });
+      setDeleteConfirmOpen(false);
     }
   }, [open]);
 
@@ -317,14 +319,14 @@ export function EditItemDialog({ open, onOpenChange, item, onSuccess }: EditItem
     }
   };
 
-  const handleDelete = async () => {
+  const handleDeleteClick = () => {
+    setDeleteConfirmOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
     if (!item) return;
 
-    const confirmed = confirm(
-      `Are you sure you want to delete "${item.item_name}"? This action cannot be undone.`
-    );
-
-    if (!confirmed) return;
+    setDeleteConfirmOpen(false);
 
     try {
       setIsDeleting(true);
@@ -453,12 +455,12 @@ export function EditItemDialog({ open, onOpenChange, item, onSuccess }: EditItem
             <Button
               type="button"
               variant="destructive"
-              onClick={handleDelete}
+              onClick={handleDeleteClick}
               disabled={isSubmitting || isDeleting}
               className="w-full sm:w-auto"
             >
               <Trash2 className="mr-2 h-4 w-4" />
-              {isDeleting ? "Deleting..." : "Delete Item"}
+              Delete Item
             </Button>
             <div className="flex gap-2 w-full sm:w-auto">
               <Button
@@ -477,6 +479,59 @@ export function EditItemDialog({ open, onOpenChange, item, onSuccess }: EditItem
           </DialogFooter>
         </form>
       </DialogContent>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-destructive/10">
+                <AlertTriangle className="h-5 w-5 text-destructive" />
+              </div>
+              <div>
+                <DialogTitle>Delete Item</DialogTitle>
+                <DialogDescription className="mt-1">
+                  This action cannot be undone.
+                </DialogDescription>
+              </div>
+            </div>
+          </DialogHeader>
+          <div className="py-4">
+            <p className="text-sm text-muted-foreground">
+              Are you sure you want to delete <span className="font-semibold text-foreground">"{item?.item_name}"</span>? 
+              This will permanently remove the item and all associated data from the system.
+            </p>
+          </div>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setDeleteConfirmOpen(false)}
+              disabled={isDeleting}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={handleDeleteConfirm}
+              disabled={isDeleting}
+            >
+              {isDeleting ? (
+                <>
+                  <span className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                  Deleting...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Delete Item
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Dialog>
   );
 }

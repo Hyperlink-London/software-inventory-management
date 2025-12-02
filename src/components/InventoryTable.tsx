@@ -375,7 +375,7 @@ export function InventoryTable({ items, stickyControls = false, maxHeight = "non
   if (stickyControls) {
     return (
       <div className="flex flex-col" style={{ maxHeight }}>
-        <div className="sticky top-0 z-20 bg-background pb-4 border-b mb-4">
+        <div className="sticky top-0 z-20 pb-4 border-b mb-4">
           {controlsSection}
         </div>
         <div className="overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] flex-1">
