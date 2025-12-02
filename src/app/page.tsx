@@ -1,6 +1,9 @@
 import { createClient } from "@/utils/supabase/server";
 import { cookies } from "next/headers";
+import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { ExternalLink } from "lucide-react";
 import { InventoryTable } from "@/components/InventoryTable";
 import { CheckoutTable } from "@/components/CheckoutTable";
 import { CollapsibleCheckoutCard } from "@/components/CollapsibleCheckoutCard";
@@ -152,8 +155,18 @@ export default async function Dashboard() {
       <CollapsibleCheckoutCard checkouts={checkouts} currentUserId={userProfileId} />
 
       <Card>
-        <CardHeader>
-          <CardTitle>Inventory</CardTitle>
+        <CardHeader className="py-3">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-lg">Inventory</CardTitle>
+            {items.length > 0 && (
+              <Link href="/items">
+                <Button variant="outline" size="sm" className="h-8">
+                  <ExternalLink className="mr-2 h-3 w-3" />
+                  View All
+                </Button>
+              </Link>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
           {items.length === 0 ? (
