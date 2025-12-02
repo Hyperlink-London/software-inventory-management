@@ -7,6 +7,7 @@ import { ExternalLink } from "lucide-react";
 import { InventoryTable } from "@/components/InventoryTable";
 import { CheckoutTable } from "@/components/CheckoutTable";
 import { CollapsibleCheckoutCard } from "@/components/CollapsibleCheckoutCard";
+import { AddItemButton } from "@/components/AddItemButton";
 
 type ItemWithTags = {
   id: string;
@@ -147,7 +148,10 @@ export default async function Dashboard() {
       <Card>
         <CardHeader className="py-3">
           <div className="flex items-center justify-between">
-            <CardTitle className="text-lg">Inventory</CardTitle>
+            <div className="flex items-center gap-3">
+              <CardTitle className="text-lg">Inventory</CardTitle>
+              <AddItemButton />
+            </div>
             {items.length > 0 && (
               <Link href="/items">
                 <Button variant="outline" size="sm" className="h-8">
@@ -164,7 +168,7 @@ export default async function Dashboard() {
               No items found in inventory.
             </div>
           ) : (
-            <InventoryTable items={items} />
+            <InventoryTable items={items} stickyControls maxHeight="600px" />
           )}
         </CardContent>
       </Card>

@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Search, Filter, X, CheckCircle, AlertCircle, XCircle, ShoppingCart } from "lucide-react";
+import { Search, Filter, X, CheckCircle, AlertCircle, XCircle, ShoppingCart, Pencil } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -27,6 +27,7 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { CheckoutDialog } from "@/components/CheckoutDialog";
+import { EditItemDialog } from "@/components/EditItemDialog";
 import { checkoutItem } from "@/actions/checkout/action";
 
 type ItemWithTags = {
@@ -43,13 +44,17 @@ type ItemWithTags = {
 
 type InventoryTableProps = {
   items: ItemWithTags[];
+  stickyControls?: boolean;
+  maxHeight?: string;
+  onItemUpdate?: () => void;
 };
 
-export function InventoryTable({ items }: InventoryTableProps) {
+export function InventoryTable({ items, stickyControls = false, maxHeight = "none", onItemUpdate }: InventoryTableProps) {
   const [searchQuery, setSearchQuery] = React.useState("");
   const [selectedTags, setSelectedTags] = React.useState<string[]>([]);
   const [filterOpen, setFilterOpen] = React.useState(false);
   const [checkoutDialogOpen, setCheckoutDialogOpen] = React.useState(false);
+  const [editDialogOpen, setEditDialogOpen] = React.useState(false);
   const [selectedItem, setSelectedItem] = React.useState<ItemWithTags | null>(null);
   const [mounted, setMounted] = React.useState(false);
 
@@ -128,6 +133,19 @@ export function InventoryTable({ items }: InventoryTableProps) {
     setCheckoutDialogOpen(true);
   };
 
+  const handleEditClick = (item: ItemWithTags) => {
+    setSelectedItem(item);
+    setEditDialogOpen(true);
+  };
+
+  const handleItemUpdate = () => {
+    if (onItemUpdate) {
+      onItemUpdate();
+    } else {
+      window.location.reload();
+    }
+  };
+
   const handleCheckout = async (data: {
     item_id: string;
     quantity: number;
@@ -138,7 +156,7 @@ export function InventoryTable({ items }: InventoryTableProps) {
     window.location.reload();
   };
 
-  return (
+  const controlsSection = (
     <div className="space-y-4">
       {/* Search and Filter Bar */}
       <div className="flex flex-col sm:flex-row gap-3">
@@ -227,8 +245,11 @@ export function InventoryTable({ items }: InventoryTableProps) {
       <div className="text-sm text-muted-foreground">
         Showing {filteredItems.length} of {items.length} items
       </div>
+    </div>
+  );
 
-      {/* Table */}
+  const tableSection = (
+    <>
       {filteredItems.length === 0 ? (
         <div className="text-center py-12 text-muted-foreground">
           No items found matching your filters.
@@ -236,7 +257,7 @@ export function InventoryTable({ items }: InventoryTableProps) {
       ) : (
         <div className="rounded-md border">
           <Table>
-            <TableHeader>
+            <TableHeader className="sticky top-0 bg-background z-10">
               <TableRow>
                 <TableHead className="w-[100px]">Image</TableHead>
                 <TableHead>Status</TableHead>
@@ -244,7 +265,7 @@ export function InventoryTable({ items }: InventoryTableProps) {
                 <TableHead>Quantity</TableHead>
                 <TableHead>Tags</TableHead>
                 <TableHead>Notes</TableHead>
-                <TableHead className="w-[120px]">Actions</TableHead>
+                <TableHead className="w-[180px]">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -301,16 +322,27 @@ export function InventoryTable({ items }: InventoryTableProps) {
                     {item.notes || <span className="text-muted-foreground">—</span>}
                   </TableCell>
                   <TableCell>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleCheckoutClick(item)}
-                      disabled={item.quantity === 0}
-                      className="w-full"
-                    >
-                      <ShoppingCart className="mr-2 h-4 w-4" />
-                      Checkout
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleEditClick(item)}
+                        className="flex-1"
+                      >
+                        <Pencil className="mr-2 h-4 w-4" />
+                        Edit
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleCheckoutClick(item)}
+                        disabled={item.quantity === 0}
+                        className="flex-1"
+                      >
+                        <ShoppingCart className="mr-2 h-4 w-4" />
+                        Checkout
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
@@ -318,13 +350,53 @@ export function InventoryTable({ items }: InventoryTableProps) {
           </Table>
         </div>
       )}
+    </>
+  );
 
+  if (stickyControls) {
+    return (
+      <div className="flex flex-col" style={{ maxHeight }}>
+        <div className="sticky top-0 z-20 bg-background pb-4 border-b mb-4">
+          {controlsSection}
+        </div>
+        <div className="overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] flex-1">
+          {tableSection}
+        </div>
+        {/* Checkout Dialog */}
+        <CheckoutDialog
+          open={checkoutDialogOpen}
+          onOpenChange={setCheckoutDialogOpen}
+          item={selectedItem}
+          onCheckout={handleCheckout}
+        />
+        {/* Edit Item Dialog */}
+        <EditItemDialog
+          open={editDialogOpen}
+          onOpenChange={setEditDialogOpen}
+          item={selectedItem}
+          onSuccess={handleItemUpdate}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {controlsSection}
+      {tableSection}
       {/* Checkout Dialog */}
       <CheckoutDialog
         open={checkoutDialogOpen}
         onOpenChange={setCheckoutDialogOpen}
         item={selectedItem}
         onCheckout={handleCheckout}
+      />
+      {/* Edit Item Dialog */}
+      <EditItemDialog
+        open={editDialogOpen}
+        onOpenChange={setEditDialogOpen}
+        item={selectedItem}
+        onSuccess={handleItemUpdate}
       />
     </div>
   );
