@@ -17,6 +17,7 @@ import {
 import { useUser, getProfileID } from "@/contexts/UserContext";
 import { TagSelector } from "@/components/TagSelector";
 import { TagOption } from "@/hooks/useTagSelector";
+import { toast } from "sonner";
 
 /**
  * Fetches all tags from the Supabase 'tags' table.
@@ -143,12 +144,12 @@ export function AddItemDialog({ open, onOpenChange, onSuccess }: AddItemDialogPr
     e.preventDefault();
 
     if (!user) {
-      alert("You must be logged in to add an item");
+      toast.error("You must be logged in to add an item");
       return;
     }
 
     if (!formData.name.trim()) {
-      alert("Please enter an item name");
+      toast.error("Please enter an item name");
       return;
     }
 
@@ -169,7 +170,7 @@ export function AddItemDialog({ open, onOpenChange, onSuccess }: AddItemDialogPr
 
         if (uploadError) {
           console.error("Image upload failed:", uploadError);
-          alert("Failed to upload image");
+          toast.error("Failed to upload image");
           return;
         }
 
@@ -201,7 +202,7 @@ export function AddItemDialog({ open, onOpenChange, onSuccess }: AddItemDialogPr
       // error should be null if insert was successful
       if (itemError) {
         console.error("Insert failed:", itemError);
-        alert("Failed to add item");
+        toast.error("Failed to add item");
         return;
       }
 
@@ -259,7 +260,7 @@ export function AddItemDialog({ open, onOpenChange, onSuccess }: AddItemDialogPr
 
           if (itemTagError) {
             console.error("Inserting item tags failed:", itemTagError);
-            alert("Item added but failed to add tags");
+            toast.warning("Item added but failed to add tags");
           } else {
             console.log("Item tags inserted:", itemTagData);
           }
@@ -269,7 +270,7 @@ export function AddItemDialog({ open, onOpenChange, onSuccess }: AddItemDialogPr
       // ============================
       // Reset form and close dialog
       // ============================
-      alert("Item added successfully!");
+      toast.success("Item added successfully!");
 
       setFormData({
         id: "",
@@ -285,13 +286,10 @@ export function AddItemDialog({ open, onOpenChange, onSuccess }: AddItemDialogPr
       // Call onSuccess callback to refresh the page
       if (onSuccess) {
         onSuccess();
-      } else {
-        // Fallback to reload if no callback provided
-        window.location.reload();
       }
     } catch (error) {
       console.error("Error submitting form:", error);
-      alert("An error occurred while adding the item");
+      toast.error("An error occurred while adding the item");
     } finally {
       setIsSubmitting(false);
     }

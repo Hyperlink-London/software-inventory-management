@@ -7,6 +7,7 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { UserProvider, useUser } from "@/contexts/UserContext";
 import GitHubSignInButton from "./GitHubSignInButton";
+import { Toaster } from "sonner";
 
 // Note: Fonts/Metadata definition should ideally stay outside the client component
 // but must be included here since the whole component is now client-side.
@@ -85,6 +86,7 @@ export default function RootLayout({
       >
         <UserProvider>
           <LayoutContent>{children}</LayoutContent>
+          <Toaster position="top-right" richColors />
         </UserProvider>
       </body>
     </html>

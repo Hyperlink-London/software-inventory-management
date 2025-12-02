@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useRouter } from "next/navigation";
 import { Search, Filter, X, CheckCircle, AlertCircle, XCircle, ShoppingCart, Pencil } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -50,6 +51,8 @@ type InventoryTableProps = {
 };
 
 export function InventoryTable({ items, stickyControls = false, maxHeight = "none", onItemUpdate }: InventoryTableProps) {
+  const router = useRouter();
+  const [localItems, setLocalItems] = React.useState<ItemWithTags[]>(items);
   const [searchQuery, setSearchQuery] = React.useState("");
   const [selectedTags, setSelectedTags] = React.useState<string[]>([]);
   const [filterOpen, setFilterOpen] = React.useState(false);
@@ -57,6 +60,11 @@ export function InventoryTable({ items, stickyControls = false, maxHeight = "non
   const [editDialogOpen, setEditDialogOpen] = React.useState(false);
   const [selectedItem, setSelectedItem] = React.useState<ItemWithTags | null>(null);
   const [mounted, setMounted] = React.useState(false);
+
+  // Sync local items with props when they change
+  React.useEffect(() => {
+    setLocalItems(items);
+  }, [items]);
 
   // Only render Popover after mount to avoid hydration mismatch
   React.useEffect(() => {
@@ -66,15 +74,15 @@ export function InventoryTable({ items, stickyControls = false, maxHeight = "non
   // Get all unique tags from items
   const allTags = React.useMemo(() => {
     const tagSet = new Set<string>();
-    items.forEach((item) => {
+    localItems.forEach((item) => {
       item.tags.forEach((tag) => tagSet.add(tag.name));
     });
     return Array.from(tagSet).sort();
-  }, [items]);
+  }, [localItems]);
 
   // Filter items based on search and tags
   const filteredItems = React.useMemo(() => {
-    return items.filter((item) => {
+    return localItems.filter((item) => {
       // Search filter
       const matchesSearch =
         searchQuery === "" ||
@@ -91,7 +99,7 @@ export function InventoryTable({ items, stickyControls = false, maxHeight = "non
 
       return matchesSearch && matchesTags;
     });
-  }, [items, searchQuery, selectedTags]);
+  }, [localItems, searchQuery, selectedTags]);
 
   const toggleTag = (tagName: string) => {
     setSelectedTags((prev) =>
@@ -138,13 +146,24 @@ export function InventoryTable({ items, stickyControls = false, maxHeight = "non
     setEditDialogOpen(true);
   };
 
-  const handleItemUpdate = () => {
+  const handleItemUpdate = React.useCallback((updatedItem?: ItemWithTags, deletedItemId?: string) => {
+    if (deletedItemId) {
+      // Optimistically remove the deleted item
+      setLocalItems((prev) => prev.filter((item) => item.id !== deletedItemId));
+    } else if (updatedItem) {
+      // Optimistically update the item
+      setLocalItems((prev) =>
+        prev.map((item) => (item.id === updatedItem.id ? updatedItem : item))
+      );
+    }
+    
+    // Refresh server data in the background without blocking UI
+    router.refresh();
+    
     if (onItemUpdate) {
       onItemUpdate();
-    } else {
-      window.location.reload();
     }
-  };
+  }, [router, onItemUpdate]);
 
   const handleCheckout = async (data: {
     item_id: string;
@@ -243,7 +262,7 @@ export function InventoryTable({ items, stickyControls = false, maxHeight = "non
 
       {/* Results Count */}
       <div className="text-sm text-muted-foreground">
-        Showing {filteredItems.length} of {items.length} items
+        Showing {filteredItems.length} of {localItems.length} items
       </div>
     </div>
   );

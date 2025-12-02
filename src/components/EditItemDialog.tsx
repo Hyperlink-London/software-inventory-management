@@ -17,6 +17,7 @@ import {
 import { TagSelector } from "@/components/TagSelector";
 import { TagOption } from "@/hooks/useTagSelector";
 import { Trash2 } from "lucide-react";
+import { toast } from "sonner";
 
 /**
  * Fetches all tags from the Supabase 'tags' table.
@@ -57,7 +58,7 @@ type EditItemDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   item: ItemWithTags | null;
-  onSuccess?: () => void;
+  onSuccess?: (updatedItem?: ItemWithTags, deletedItemId?: string) => void;
 };
 
 export function EditItemDialog({ open, onOpenChange, item, onSuccess }: EditItemDialogProps) {
@@ -157,7 +158,7 @@ export function EditItemDialog({ open, onOpenChange, item, onSuccess }: EditItem
     if (!item) return;
 
     if (!formData.name.trim()) {
-      alert("Please enter an item name");
+      toast.error("Please enter an item name");
       return;
     }
 
@@ -176,7 +177,7 @@ export function EditItemDialog({ open, onOpenChange, item, onSuccess }: EditItem
 
         if (uploadError) {
           console.error("Image upload failed:", uploadError);
-          alert("Failed to upload image");
+          toast.error("Failed to upload image");
           return;
         }
 
@@ -189,7 +190,7 @@ export function EditItemDialog({ open, onOpenChange, item, onSuccess }: EditItem
       }
 
       // Update item
-      const { error: itemError } = await supabase
+      const { data: updatedItemData, error: itemError } = await supabase
         .from("items")
         .update({
           item_name: formData.name,
@@ -197,11 +198,13 @@ export function EditItemDialog({ open, onOpenChange, item, onSuccess }: EditItem
           notes: formData.notes,
           image_URL: image_URL,
         })
-        .eq("id", item.id);
+        .eq("id", item.id)
+        .select()
+        .single();
 
       if (itemError) {
         console.error("Update failed:", itemError);
-        alert("Failed to update item");
+        toast.error("Failed to update item");
         return;
       }
 
@@ -259,22 +262,56 @@ export function EditItemDialog({ open, onOpenChange, item, onSuccess }: EditItem
 
           if (itemTagError) {
             console.error("Inserting item tags failed:", itemTagError);
-            alert("Item updated but failed to update tags");
+            toast.warning("Item updated but failed to update tags");
           }
         }
       }
 
-      alert("Item updated successfully!");
+      // Fetch updated item with tags for optimistic update
+      const { data: itemWithTagsData } = await supabase
+        .from("items")
+        .select(`
+          id,
+          item_name,
+          quantity,
+          notes,
+          image_URL,
+          itemtags(
+            tags(
+              id,
+              name
+            )
+          )
+        `)
+        .eq("id", item.id)
+        .single();
+
+      let updatedItem: ItemWithTags | undefined;
+      if (itemWithTagsData) {
+        updatedItem = {
+          id: itemWithTagsData.id,
+          item_name: itemWithTagsData.item_name,
+          quantity: itemWithTagsData.quantity,
+          notes: itemWithTagsData.notes,
+          image_URL: itemWithTagsData.image_URL,
+          tags: (itemWithTagsData.itemtags || [])
+            .filter((it: any) => it.tags && !it.tags.deleted_at && !it.deleted_at)
+            .map((it: any) => ({
+              id: it.tags.id,
+              name: it.tags.name,
+            })),
+        };
+      }
+
+      toast.success("Item updated successfully!");
       onOpenChange(false);
       
       if (onSuccess) {
-        onSuccess();
-      } else {
-        window.location.reload();
+        onSuccess(updatedItem);
       }
     } catch (error) {
       console.error("Error updating item:", error);
-      alert("An error occurred while updating the item");
+      toast.error("An error occurred while updating the item");
     } finally {
       setIsSubmitting(false);
     }
@@ -312,21 +349,19 @@ export function EditItemDialog({ open, onOpenChange, item, onSuccess }: EditItem
 
       if (error) {
         console.error("Delete failed:", error);
-        alert("Failed to delete item");
+        toast.error("Failed to delete item");
         return;
       }
 
-      alert("Item deleted successfully!");
+      toast.success("Item deleted successfully!");
       onOpenChange(false);
       
       if (onSuccess) {
-        onSuccess();
-      } else {
-        window.location.reload();
+        onSuccess(undefined, item.id);
       }
     } catch (error) {
       console.error("Error deleting item:", error);
-      alert("An error occurred while deleting the item");
+      toast.error("An error occurred while deleting the item");
     } finally {
       setIsDeleting(false);
     }
