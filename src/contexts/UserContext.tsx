@@ -38,7 +38,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         setLoading(false);
         return;
       }
-      
       // Prefer user from getUser() as it's more reliable, fallback to session.user
       const finalUser = user || session?.user || null;
       setSession(session);
@@ -107,3 +106,29 @@ export function useUser() {
   return context;
 }
 
+export async function getProfileID() {
+  const supabase = createClient();
+
+  // Get the currently logged-in user
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
+
+  if (userError || !user) return null;
+
+  // Query profile row for matching UUID
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("id")
+    .eq("supabase_uid", user.id)
+    .single();
+
+  if (error) {
+    console.log("authID: ", user.id);
+    console.error("Failed to fetch profile ID:", error);
+    return null;
+  }
+
+  return data?.id ?? null;
+}
