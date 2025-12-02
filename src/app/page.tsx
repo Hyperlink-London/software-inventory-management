@@ -140,16 +140,6 @@ export default async function Dashboard() {
         <h1 className="text-4xl font-bold tracking-tight">
           Dashboard
         </h1>
-        {username && (
-          <p className="text-xl text-muted-foreground">
-            Welcome back, <span className="font-semibold text-foreground">{username}</span>
-          </p>
-        )}
-        {!username && session && (
-          <p className="text-lg text-muted-foreground">
-            Welcome, {session.user.email}
-          </p>
-        )}
       </div>
 
       <CollapsibleCheckoutCard checkouts={checkouts} currentUserId={userProfileId} />

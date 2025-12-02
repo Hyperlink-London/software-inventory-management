@@ -6,6 +6,7 @@ import "./globals.css";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { UserProvider } from "@/contexts/UserContext";
+import { PageTransition } from "@/components/PageTransition";
 
 // Note: Fonts/Metadata definition should ideally stay outside the client component
 // but must be included here since the whole layout is now client-side.
@@ -40,7 +41,9 @@ export default function RootLayout({
       >
         <UserProvider>
         <Navbar />
-        <main className="mx-auto w-full max-w-6xl px-4 py-8">{children}</main>
+        <main className="mx-auto w-full max-w-6xl px-4 py-8">
+          <PageTransition>{children}</PageTransition>
+        </main>
         <Footer />
         </UserProvider>
       </body>

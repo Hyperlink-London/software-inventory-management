@@ -70,20 +70,37 @@ export function CollapsibleCheckoutCard({
               }}
             >
               {isOpen ? (
-                <ChevronUp className="h-4 w-4" />
+                <ChevronUp className="h-4 w-4 transition-transform duration-300" />
               ) : (
-                <ChevronDown className="h-4 w-4" />
+                <ChevronDown className="h-4 w-4 transition-transform duration-300" />
               )}
               <span className="sr-only">Toggle checkout table</span>
             </Button>
           </div>
         </div>
       </CardHeader>
-      {isOpen && (
-        <CardContent>
+      <div
+        className={cn(
+          "overflow-hidden transition-all duration-500 ease-in-out",
+          isOpen 
+            ? "max-h-[5000px] opacity-100" 
+            : "max-h-0 opacity-0"
+        )}
+        style={{
+          transition: "max-height 500ms ease-in-out, opacity 400ms ease-in-out",
+        }}
+      >
+        <CardContent 
+          className={cn(
+            "transition-all duration-500 ease-in-out",
+            isOpen 
+              ? "translate-y-0 opacity-100" 
+              : "-translate-y-2 opacity-0"
+          )}
+        >
           <CheckoutTable checkouts={checkouts} currentUserId={currentUserId} />
         </CardContent>
-      )}
+      </div>
     </Card>
   );
 }
