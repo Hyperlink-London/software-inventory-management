@@ -1,23 +1,24 @@
 "use client";
 
 import Link from "next/link";
+import { Button } from "@/components/ui/button";
 import { LogoutButton } from "@/components/LogoutButton";
 
 export default function Navbar() {
   return (
-    <header className="w-full border-b border-zinc-200 dark:border-zinc-800 bg-white/70 dark:bg-black/70 backdrop-blur">
+    <header className="w-full border-b border-border bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="mx-auto max-w-6xl px-4 py-3 flex items-center justify-between">
-        <Link href="/" className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
-          Software Inventory
+        <Link href="/" className="text-lg font-semibold text-foreground hover:opacity-80 transition-opacity">
+          Hyperlink Inventory
         </Link>
-        <nav className="flex items-center gap-4 text-sm">
-          <LogoutButton></LogoutButton>
-          <Link href="/items" className="text-zinc-700 hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-white">
-            Items
-          </Link>
-          <Link href="/add_edit" className="text-zinc-700 hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-white">
-            Add Item
-          </Link>
+        <nav className="flex items-center gap-3">
+          <Button variant="outline" size="sm" asChild>
+            <Link href="/">Dashboard</Link>
+          </Button>
+          <Button variant="outline" size="sm" asChild>
+            <Link href="/items">Inventory</Link>
+          </Button>
+          <LogoutButton />
         </nav>
       </div>
     </header>
