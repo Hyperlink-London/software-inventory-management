@@ -1,12 +1,6 @@
 "use client";
 
-import {
-  createContext,
-  useContext,
-  useEffect,
-  useState,
-  useCallback,
-} from "react";
+import { createContext, useContext, useEffect, useState, useCallback } from "react";
 import { createClient } from "@/utils/supabase/client";
 import type { User, Session } from "@supabase/supabase-js";
 
@@ -33,16 +27,10 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     try {
       const supabase = createClient();
       // Use getUser() to ensure we get fresh session data
-      const {
-        data: { user },
-        error: userError,
-      } = await supabase.auth.getUser();
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
       // Also get session for detailed session info
-      const {
-        data: { session },
-        error: sessionError,
-      } = await supabase.auth.getSession();
-
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
       // If both getUser and getSession fail, clear the session
       if (userError && sessionError && !session) {
         setSession(null);
@@ -50,7 +38,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         setLoading(false);
         return;
       }
-
       // Prefer user from getUser() as it's more reliable, fallback to session.user
       const finalUser = user || session?.user || null;
       setSession(session);
@@ -87,10 +74,10 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   // Refresh session when coming from auth callback with refresh param
   useEffect(() => {
     if (typeof window === "undefined") return;
-
+    
     const urlParams = new URLSearchParams(window.location.search);
     const refresh = urlParams.get("refresh");
-
+    
     if (refresh === "true") {
       // Small delay to ensure cookies are set after server redirect
       const timer = setTimeout(() => {
@@ -105,9 +92,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   }, [refreshSession]);
 
   return (
-    <UserContext.Provider
-      value={{ user, session, loading, refresh: refreshSession }}
-    >
+    <UserContext.Provider value={{ user, session, loading, refresh: refreshSession }}>
       {children}
     </UserContext.Provider>
   );
