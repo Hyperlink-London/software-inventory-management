@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { InventoryTable } from "@/components/InventoryTable";
 import { CheckoutTable } from "@/components/CheckoutTable";
+import { CollapsibleCheckoutCard } from "@/components/CollapsibleCheckoutCard";
 
 type ItemWithTags = {
   id: string;
@@ -148,14 +149,7 @@ export default async function Dashboard() {
         )}
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Checkouts</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <CheckoutTable checkouts={checkouts} currentUserId={userProfileId} />
-        </CardContent>
-      </Card>
+      <CollapsibleCheckoutCard checkouts={checkouts} currentUserId={userProfileId} />
 
       <Card>
         <CardHeader>
