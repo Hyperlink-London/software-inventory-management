@@ -176,22 +176,22 @@ export function InventoryTable({ items, stickyControls = false, maxHeight = "non
   };
 
   const controlsSection = (
-    <div className="space-y-4">
+    <div className="space-y-3 sm:space-y-4">
       {/* Search and Filter Bar */}
-      <div className="flex flex-col sm:flex-row gap-3">
+      <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             placeholder="Search items, tags, or notes..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9"
+            className="pl-9 h-10 sm:h-9 text-base sm:text-sm"
           />
         </div>
         {mounted ? (
           <Popover open={filterOpen} onOpenChange={setFilterOpen}>
             <PopoverTrigger asChild>
-              <Button variant="outline" className="w-full sm:w-auto">
+              <Button variant="outline" className="w-full sm:w-auto h-10 sm:h-9 text-base sm:text-sm">
                 <Filter className="mr-2 h-4 w-4" />
                 Filter by Tags
                 {selectedTags.length > 0 && (
@@ -201,7 +201,7 @@ export function InventoryTable({ items, stickyControls = false, maxHeight = "non
                 )}
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-[200px] p-0" align="start">
+            <PopoverContent className="w-[calc(100vw-2rem)] sm:w-[200px] p-0" align="start">
               <Command>
                 <CommandInput placeholder="Search tags..." />
                 <CommandList>
@@ -225,7 +225,7 @@ export function InventoryTable({ items, stickyControls = false, maxHeight = "non
             </PopoverContent>
           </Popover>
         ) : (
-          <Button variant="outline" className="w-full sm:w-auto" disabled>
+          <Button variant="outline" className="w-full sm:w-auto h-10 sm:h-9 text-base sm:text-sm" disabled>
             <Filter className="mr-2 h-4 w-4" />
             Filter by Tags
             {selectedTags.length > 0 && (
@@ -236,7 +236,7 @@ export function InventoryTable({ items, stickyControls = false, maxHeight = "non
           </Button>
         )}
         {(selectedTags.length > 0 || searchQuery) && (
-          <Button variant="ghost" onClick={clearFilters} className="w-full sm:w-auto">
+          <Button variant="ghost" onClick={clearFilters} className="w-full sm:w-auto h-10 sm:h-9 text-base sm:text-sm">
             <X className="mr-2 h-4 w-4" />
             Clear
           </Button>
@@ -267,6 +267,88 @@ export function InventoryTable({ items, stickyControls = false, maxHeight = "non
     </div>
   );
 
+  // Mobile card view component
+  const mobileCardView = (
+    <div className="space-y-3 sm:hidden">
+      {filteredItems.map((item) => (
+        <div key={item.id} className="rounded-lg border p-4 space-y-3">
+          <div className="flex items-start gap-3">
+            {item.image_URL ? (
+              <div className="relative h-20 w-20 flex-shrink-0 overflow-hidden rounded-md border border-border">
+                <img
+                  src={item.image_URL}
+                  alt={item.item_name}
+                  className="h-full w-full object-cover"
+                />
+              </div>
+            ) : (
+              <div className="flex h-20 w-20 flex-shrink-0 items-center justify-center rounded-md border border-border bg-muted text-muted-foreground">
+                <span className="text-xs">No image</span>
+              </div>
+            )}
+            <div className="flex-1 min-w-0">
+              <div className="flex items-start justify-between gap-2">
+                <h3 className="font-semibold text-base truncate">{item.item_name}</h3>
+                <div className="flex-shrink-0">{getStatusIcon(item.quantity)}</div>
+              </div>
+              <div className="mt-1 flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">Quantity:</span>
+                <span
+                  className={
+                    item.quantity === 0
+                      ? "text-destructive font-semibold"
+                      : item.quantity < 5
+                      ? "text-yellow-500 font-semibold"
+                      : "font-semibold"
+                  }
+                >
+                  {item.quantity}
+                </span>
+              </div>
+            </div>
+          </div>
+          
+          {item.tags.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {item.tags.map((tag) => (
+                <Badge key={tag.id} variant="secondary" className="text-xs">
+                  {tag.name}
+                </Badge>
+              ))}
+            </div>
+          )}
+          
+          {item.notes && (
+            <div>
+              <p className="text-xs text-muted-foreground mb-1">Notes:</p>
+              <p className="text-sm text-muted-foreground line-clamp-2">{item.notes}</p>
+            </div>
+          )}
+          
+          <div className="flex gap-2 pt-2">
+            <Button
+              variant="outline"
+              onClick={() => handleEditClick(item)}
+              className="flex-1 h-11 text-sm"
+            >
+              <Pencil className="mr-2 h-4 w-4" />
+              Edit
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => handleCheckoutClick(item)}
+              disabled={item.quantity === 0}
+              className="flex-1 h-11 text-sm"
+            >
+              <ShoppingCart className="mr-2 h-4 w-4" />
+              Checkout
+            </Button>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+
   const tableSection = (
     <>
       {filteredItems.length === 0 ? (
@@ -274,100 +356,106 @@ export function InventoryTable({ items, stickyControls = false, maxHeight = "non
           No items found matching your filters.
         </div>
       ) : (
-        <div className="rounded-md border">
-          <Table>
-            <TableHeader className="sticky top-0 bg-background z-10">
-              <TableRow>
-                <TableHead className="w-[100px]">Image</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Item Name</TableHead>
-                <TableHead>Quantity</TableHead>
-                <TableHead>Tags</TableHead>
-                <TableHead>Notes</TableHead>
-                <TableHead className="w-[180px]">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredItems.map((item) => (
-                <TableRow key={item.id}>
-                  <TableCell>
-                    {item.image_URL ? (
-                      <div className="relative h-16 w-16 overflow-hidden rounded-md border border-border">
-                        <img
-                          src={item.image_URL}
-                          alt={item.item_name}
-                          className="h-full w-full object-cover"
-                        />
-                      </div>
-                    ) : (
-                      <div className="flex h-16 w-16 items-center justify-center rounded-md border border-border bg-muted text-muted-foreground">
-                        <span className="text-xs">No image</span>
-                      </div>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center">
-                      {getStatusIcon(item.quantity)}
-                    </div>
-                  </TableCell>
-                  <TableCell className="font-medium">{item.item_name}</TableCell>
-                  <TableCell>
-                    <span
-                      className={
-                        item.quantity === 0
-                          ? "text-destructive font-medium"
-                          : item.quantity < 5
-                          ? "text-yellow-500 font-medium"
-                          : ""
-                      }
-                    >
-                      {item.quantity}
-                    </span>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex flex-wrap gap-2">
-                      {item.tags.length > 0 ? (
-                        item.tags.map((tag) => (
-                          <Badge key={tag.id} variant="secondary">
-                            {tag.name}
-                          </Badge>
-                        ))
-                      ) : (
-                        <span className="text-muted-foreground text-sm">No tags</span>
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {item.notes || <span className="text-muted-foreground">—</span>}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleEditClick(item)}
-                        className="flex-1"
-                      >
-                        <Pencil className="mr-2 h-4 w-4" />
-                        Edit
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleCheckoutClick(item)}
-                        disabled={item.quantity === 0}
-                        className="flex-1"
-                      >
-                        <ShoppingCart className="mr-2 h-4 w-4" />
-                        Checkout
-                      </Button>
-                    </div>
-                  </TableCell>
+        <>
+          {/* Mobile Card View */}
+          {mobileCardView}
+          
+          {/* Desktop Table View */}
+          <div className="hidden sm:block rounded-md border overflow-x-auto">
+            <Table>
+              <TableHeader className="sticky top-0 bg-background z-10">
+                <TableRow>
+                  <TableHead className="w-[100px]">Image</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Item Name</TableHead>
+                  <TableHead>Quantity</TableHead>
+                  <TableHead>Tags</TableHead>
+                  <TableHead className="hidden md:table-cell">Notes</TableHead>
+                  <TableHead className="w-[180px]">Actions</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+              </TableHeader>
+              <TableBody>
+                {filteredItems.map((item) => (
+                  <TableRow key={item.id}>
+                    <TableCell>
+                      {item.image_URL ? (
+                        <div className="relative h-16 w-16 overflow-hidden rounded-md border border-border">
+                          <img
+                            src={item.image_URL}
+                            alt={item.item_name}
+                            className="h-full w-full object-cover"
+                          />
+                        </div>
+                      ) : (
+                        <div className="flex h-16 w-16 items-center justify-center rounded-md border border-border bg-muted text-muted-foreground">
+                          <span className="text-xs">No image</span>
+                        </div>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center">
+                        {getStatusIcon(item.quantity)}
+                      </div>
+                    </TableCell>
+                    <TableCell className="font-medium">{item.item_name}</TableCell>
+                    <TableCell>
+                      <span
+                        className={
+                          item.quantity === 0
+                            ? "text-destructive font-medium"
+                            : item.quantity < 5
+                            ? "text-yellow-500 font-medium"
+                            : ""
+                        }
+                      >
+                        {item.quantity}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex flex-wrap gap-2">
+                        {item.tags.length > 0 ? (
+                          item.tags.map((tag) => (
+                            <Badge key={tag.id} variant="secondary">
+                              {tag.name}
+                            </Badge>
+                          ))
+                        ) : (
+                          <span className="text-muted-foreground text-sm">No tags</span>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell className="hidden md:table-cell text-muted-foreground">
+                      {item.notes || <span className="text-muted-foreground">—</span>}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleEditClick(item)}
+                          className="flex-1"
+                        >
+                          <Pencil className="mr-2 h-4 w-4" />
+                          Edit
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleCheckoutClick(item)}
+                          disabled={item.quantity === 0}
+                          className="flex-1"
+                        >
+                          <ShoppingCart className="mr-2 h-4 w-4" />
+                          Checkout
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </>
       )}
     </>
   );

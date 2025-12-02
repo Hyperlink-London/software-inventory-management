@@ -19,7 +19,7 @@ export function AddItemButton() {
       <Button
         variant="default"
         size="sm"
-        className="h-8"
+        className="h-9 sm:h-8 text-sm"
         onClick={() => setOpen(true)}
       >
         <Plus className="mr-2 h-3 w-3" />

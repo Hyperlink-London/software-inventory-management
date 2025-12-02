@@ -373,7 +373,7 @@ export function EditItemDialog({ open, onOpenChange, item, onSuccess }: EditItem
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto w-[calc(100vw-1rem)] sm:w-full">
         <DialogHeader>
           <DialogTitle>Edit Item</DialogTitle>
           <DialogDescription>
@@ -457,7 +457,7 @@ export function EditItemDialog({ open, onOpenChange, item, onSuccess }: EditItem
               variant="destructive"
               onClick={handleDeleteClick}
               disabled={isSubmitting || isDeleting}
-              className="w-full sm:w-auto"
+              className="w-full sm:w-auto h-11 sm:h-10"
             >
               <Trash2 className="mr-2 h-4 w-4" />
               Delete Item
@@ -468,11 +468,11 @@ export function EditItemDialog({ open, onOpenChange, item, onSuccess }: EditItem
                 variant="outline"
                 onClick={() => onOpenChange(false)}
                 disabled={isSubmitting || isDeleting}
-                className="flex-1 sm:flex-initial"
+                className="flex-1 sm:flex-initial h-11 sm:h-10"
               >
                 Cancel
               </Button>
-              <Button type="submit" disabled={isSubmitting || isDeleting} className="flex-1 sm:flex-initial">
+              <Button type="submit" disabled={isSubmitting || isDeleting} className="flex-1 sm:flex-initial h-11 sm:h-10">
                 {isSubmitting ? "Saving..." : "Save Changes"}
               </Button>
             </div>
@@ -482,7 +482,7 @@ export function EditItemDialog({ open, onOpenChange, item, onSuccess }: EditItem
 
       {/* Delete Confirmation Dialog */}
       <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md w-[calc(100vw-1rem)] sm:w-full">
           <DialogHeader>
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-full bg-destructive/10">
@@ -502,12 +502,13 @@ export function EditItemDialog({ open, onOpenChange, item, onSuccess }: EditItem
               This will permanently remove the item and all associated data from the system.
             </p>
           </div>
-          <DialogFooter className="gap-2 sm:gap-0">
+          <DialogFooter className="flex-col sm:flex-row gap-2">
             <Button
               type="button"
               variant="outline"
               onClick={() => setDeleteConfirmOpen(false)}
               disabled={isDeleting}
+              className="w-full sm:w-auto h-11 sm:h-10"
             >
               Cancel
             </Button>
@@ -516,6 +517,7 @@ export function EditItemDialog({ open, onOpenChange, item, onSuccess }: EditItem
               variant="destructive"
               onClick={handleDeleteConfirm}
               disabled={isDeleting}
+              className="w-full sm:w-auto h-11 sm:h-10"
             >
               {isDeleting ? (
                 <>

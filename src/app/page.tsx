@@ -136,8 +136,8 @@ export default async function Dashboard() {
 
   // Middleware already handles auth redirects, so we can trust we have a session here
   return (
-    <div className="space-y-6">
-      <div className="space-y-2">
+    <div className="space-y-6 w-full">
+      <div className="space-y-2 text-center sm:text-left">
         <h1 className="text-4xl font-bold tracking-tight">
           Dashboard
         </h1>
@@ -145,16 +145,16 @@ export default async function Dashboard() {
 
       <CollapsibleCheckoutCard checkouts={checkouts} currentUserId={userProfileId} />
 
-      <Card>
-        <CardHeader className="py-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <CardTitle className="text-lg">Inventory</CardTitle>
+      <Card className="w-full">
+        <CardHeader className="py-3 px-3 sm:px-6">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto">
+              <CardTitle className="text-base sm:text-lg">Inventory</CardTitle>
               <AddItemButton />
             </div>
             {items.length > 0 && (
-              <Link href="/items">
-                <Button variant="outline" size="sm" className="h-8">
+              <Link href="/items" className="w-full sm:w-auto">
+                <Button variant="outline" size="sm" className="h-9 sm:h-8 w-full sm:w-auto text-sm">
                   <ExternalLink className="mr-2 h-3 w-3" />
                   View All
                 </Button>
@@ -162,7 +162,7 @@ export default async function Dashboard() {
             )}
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-3 sm:px-6">
           {items.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               No items found in inventory.

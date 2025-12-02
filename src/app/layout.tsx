@@ -68,7 +68,7 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
   return (
     <>
       <Navbar />
-      <main className="mx-auto w-full max-w-6xl px-4 py-8">{content}</main>
+      <main className="mx-auto w-full max-w-6xl px-3 sm:px-4 py-4 sm:py-8">{content}</main>
       <Footer />
     </>
   );
