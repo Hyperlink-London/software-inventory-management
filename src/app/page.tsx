@@ -1,15 +1,8 @@
 import { createClient } from "@/utils/supabase/server";
 import { cookies } from "next/headers";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
+import { InventoryTable } from "@/components/InventoryTable";
+import { CheckoutTable } from "@/components/CheckoutTable";
 
 type ItemWithTags = {
   id: string;
@@ -31,15 +24,17 @@ export default async function Dashboard() {
 
   // Fetch user profile from profiles table
   let username = null;
+  let userProfileId = null;
   if (session?.user?.id) {
     const { data: profile } = await supabase
       .from("profiles")
-      .select("username")
+      .select("id, username")
       .eq("supabase_uid", session.user.id)
       .is("deleted_at", null)
       .single();
     
     username = profile?.username || null;
+    userProfileId = profile?.id || null;
   }
 
   // Fetch items with their tags
@@ -81,6 +76,59 @@ export default async function Dashboard() {
     }
   }
 
+  // Fetch checkouts
+  type CheckoutItem = {
+    id: string;
+    item_id: string;
+    item_name: string;
+    image_URL: string | null;
+    quantity: number;
+    sign_out_date: string;
+    expected_return_date: string | null;
+    returned_date: string | null;
+    recipient_username: string;
+    recipient_id: string;
+  };
+
+  let checkouts: CheckoutItem[] = [];
+  if (session) {
+    const { data: checkoutsData, error: checkoutsError } = await supabase
+      .from("itemsignouts")
+      .select(`
+        id,
+        item_id,
+        quantity,
+        sign_out_date,
+        expected_return_date,
+        returned_date,
+        recipient_id,
+        items!inner(
+          item_name,
+          image_URL
+        ),
+        profiles(
+          username
+        )
+      `)
+      .is("deleted_at", null)
+      .order("sign_out_date", { ascending: false });
+
+    if (!checkoutsError && checkoutsData) {
+      checkouts = checkoutsData.map((checkout: any) => ({
+        id: checkout.id,
+        item_id: checkout.item_id,
+        item_name: checkout.items?.item_name || "Unknown Item",
+        image_URL: checkout.items?.image_URL || null,
+        quantity: checkout.quantity,
+        sign_out_date: checkout.sign_out_date,
+        expected_return_date: checkout.expected_return_date,
+        returned_date: checkout.returned_date,
+        recipient_username: checkout.profiles?.username || "Unknown",
+        recipient_id: checkout.recipient_id,
+      }));
+    }
+  }
+
   // Middleware already handles auth redirects, so we can trust we have a session here
   return (
     <div className="space-y-6">
@@ -102,6 +150,15 @@ export default async function Dashboard() {
 
       <Card>
         <CardHeader>
+          <CardTitle>Checkouts</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <CheckoutTable checkouts={checkouts} currentUserId={userProfileId} />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
           <CardTitle>Inventory</CardTitle>
         </CardHeader>
         <CardContent>
@@ -110,56 +167,7 @@ export default async function Dashboard() {
               No items found in inventory.
             </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[100px]">Image</TableHead>
-                  <TableHead>Item Name</TableHead>
-                  <TableHead>Quantity</TableHead>
-                  <TableHead>Tags</TableHead>
-                  <TableHead>Notes</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {items.map((item) => (
-                  <TableRow key={item.id}>
-                    <TableCell>
-                      {item.image_URL ? (
-                        <div className="relative h-16 w-16 overflow-hidden rounded-md border border-border">
-                          <img
-                            src={item.image_URL}
-                            alt={item.item_name}
-                            className="h-full w-full object-cover"
-                          />
-                        </div>
-                      ) : (
-                        <div className="flex h-16 w-16 items-center justify-center rounded-md border border-border bg-muted text-muted-foreground">
-                          <span className="text-xs">No image</span>
-                        </div>
-                      )}
-                    </TableCell>
-                    <TableCell className="font-medium">{item.item_name}</TableCell>
-                    <TableCell>{item.quantity}</TableCell>
-                    <TableCell>
-                      <div className="flex flex-wrap gap-2">
-                        {item.tags.length > 0 ? (
-                          item.tags.map((tag) => (
-                            <Badge key={tag.id} variant="secondary">
-                              {tag.name}
-                            </Badge>
-                          ))
-                        ) : (
-                          <span className="text-muted-foreground text-sm">No tags</span>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {item.notes || <span className="text-muted-foreground">—</span>}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+            <InventoryTable items={items} />
           )}
         </CardContent>
       </Card>
