@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { LogoutButton } from "@/components/LogoutButton";
 import { useUser } from "@/contexts/UserContext";
@@ -53,10 +54,10 @@ export default function Navbar() {
   return (
     <header
       className={cn(
-        "sticky top-0 z-50 transition-all duration-500 ease-in-out bg-background/95 backdrop-blur-md border-b border-border",
+        "sticky top-0 z-50 transition-all duration-500 ease-in-out overflow-hidden",
         isScrolled
           ? "py-2"
-          : "py-3"
+          : "py-3 border-b border-border"
       )}
     >
       <div
@@ -75,9 +76,16 @@ export default function Navbar() {
         >
           <Link
             href="/"
-            className="text-base sm:text-lg font-semibold text-foreground hover:opacity-80 transition-opacity truncate"
+            className="flex items-center gap-2 sm:gap-3 text-base sm:text-lg font-semibold text-foreground hover:opacity-80 transition-opacity"
           >
-            Hyperlink Inventory
+            <Image
+              src="/hyperlink_logo.png"
+              alt="Hyperlink Logo"
+              width={160}
+              height={40}
+              className="h-8 sm:h-10 w-auto object-contain"
+              priority
+            />
           </Link>
           
           {/* Desktop Navigation */}
