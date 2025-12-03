@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Search, Filter, X, CheckCircle, AlertCircle, XCircle, ShoppingCart, Pencil } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -30,6 +31,12 @@ import {
 import { CheckoutDialog } from "@/components/CheckoutDialog";
 import { EditItemDialog } from "@/components/EditItemDialog";
 import { checkoutItem } from "@/actions/checkout/action";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 type ItemWithTags = {
   id: string;
@@ -60,6 +67,8 @@ export function InventoryTable({ items, stickyControls = false, maxHeight = "non
   const [editDialogOpen, setEditDialogOpen] = React.useState(false);
   const [selectedItem, setSelectedItem] = React.useState<ItemWithTags | null>(null);
   const [mounted, setMounted] = React.useState(false);
+  const [imageDialogOpen, setImageDialogOpen] = React.useState(false);
+  const [selectedImageItem, setSelectedImageItem] = React.useState<ItemWithTags | null>(null);
 
   // Sync local items with props when they change
   React.useEffect(() => {
@@ -144,6 +153,16 @@ export function InventoryTable({ items, stickyControls = false, maxHeight = "non
   const handleEditClick = (item: ItemWithTags) => {
     setSelectedItem(item);
     setEditDialogOpen(true);
+  };
+
+  const navigateToItemDetail = (itemId: string) => {
+    router.push(`/items/${itemId}`);
+  };
+
+  const handleImageClick = (item: ItemWithTags) => {
+    if (!item.image_URL) return;
+    setSelectedImageItem(item);
+    setImageDialogOpen(true);
   };
 
   const handleItemUpdate = React.useCallback((updatedItem?: ItemWithTags, deletedItemId?: string) => {
@@ -271,16 +290,35 @@ export function InventoryTable({ items, stickyControls = false, maxHeight = "non
   const mobileCardView = (
     <div className="space-y-3 sm:hidden">
       {filteredItems.map((item) => (
-        <div key={item.id} className="rounded-lg border p-4 space-y-3">
+        <div
+          key={item.id}
+          className="rounded-lg border p-4 space-y-3 cursor-pointer"
+          role="button"
+          tabIndex={0}
+          onClick={() => navigateToItemDetail(item.id)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              navigateToItemDetail(item.id);
+            }
+          }}
+        >
           <div className="flex items-start gap-3">
             {item.image_URL ? (
-              <div className="relative h-20 w-20 flex-shrink-0 overflow-hidden rounded-md border border-border">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleImageClick(item);
+                }}
+                className="relative h-20 w-20 flex-shrink-0 overflow-hidden rounded-md border border-border focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background"
+              >
                 <img
                   src={item.image_URL}
                   alt={item.item_name}
                   className="h-full w-full object-cover"
                 />
-              </div>
+              </button>
             ) : (
               <div className="flex h-20 w-20 flex-shrink-0 items-center justify-center rounded-md border border-border bg-muted text-muted-foreground">
                 <span className="text-xs">No image</span>
@@ -288,7 +326,9 @@ export function InventoryTable({ items, stickyControls = false, maxHeight = "non
             )}
             <div className="flex-1 min-w-0">
               <div className="flex items-start justify-between gap-2">
-                <h3 className="font-semibold text-base truncate">{item.item_name}</h3>
+                <span className="font-semibold text-base truncate hover:underline">
+                  {item.item_name}
+                </span>
                 <div className="flex-shrink-0">{getStatusIcon(item.quantity)}</div>
               </div>
               <div className="mt-1 flex items-center gap-2">
@@ -328,7 +368,10 @@ export function InventoryTable({ items, stickyControls = false, maxHeight = "non
           <div className="flex gap-2 pt-2">
             <Button
               variant="outline"
-              onClick={() => handleEditClick(item)}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleEditClick(item);
+              }}
               className="flex-1 h-11 text-sm"
             >
               <Pencil className="mr-2 h-4 w-4" />
@@ -336,7 +379,10 @@ export function InventoryTable({ items, stickyControls = false, maxHeight = "non
             </Button>
             <Button
               variant="outline"
-              onClick={() => handleCheckoutClick(item)}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleCheckoutClick(item);
+              }}
               disabled={item.quantity === 0}
               className="flex-1 h-11 text-sm"
             >
@@ -376,16 +422,34 @@ export function InventoryTable({ items, stickyControls = false, maxHeight = "non
               </TableHeader>
               <TableBody>
                 {filteredItems.map((item) => (
-                  <TableRow key={item.id}>
+                  <TableRow
+                    key={item.id}
+                    className="cursor-pointer"
+                    onClick={() => navigateToItemDetail(item.id)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        navigateToItemDetail(item.id);
+                      }
+                    }}
+                    tabIndex={0}
+                  >
                     <TableCell>
                       {item.image_URL ? (
-                        <div className="relative h-16 w-16 overflow-hidden rounded-md border border-border">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleImageClick(item);
+                          }}
+                          className="relative h-16 w-16 overflow-hidden rounded-md border border-border focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background"
+                        >
                           <img
                             src={item.image_URL}
                             alt={item.item_name}
                             className="h-full w-full object-cover"
                           />
-                        </div>
+                        </button>
                       ) : (
                         <div className="flex h-16 w-16 items-center justify-center rounded-md border border-border bg-muted text-muted-foreground">
                           <span className="text-xs">No image</span>
@@ -397,7 +461,11 @@ export function InventoryTable({ items, stickyControls = false, maxHeight = "non
                         {getStatusIcon(item.quantity)}
                       </div>
                     </TableCell>
-                    <TableCell className="font-medium">{item.item_name}</TableCell>
+                    <TableCell className="font-medium">
+                      <span className="hover:underline">
+                        {item.item_name}
+                      </span>
+                    </TableCell>
                     <TableCell>
                       <span
                         className={
@@ -432,7 +500,10 @@ export function InventoryTable({ items, stickyControls = false, maxHeight = "non
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => handleEditClick(item)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleEditClick(item);
+                          }}
                           className="flex-1"
                         >
                           <Pencil className="mr-2 h-4 w-4" />
@@ -441,7 +512,10 @@ export function InventoryTable({ items, stickyControls = false, maxHeight = "non
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => handleCheckoutClick(item)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleCheckoutClick(item);
+                          }}
                           disabled={item.quantity === 0}
                           className="flex-1"
                         >
@@ -483,6 +557,25 @@ export function InventoryTable({ items, stickyControls = false, maxHeight = "non
           item={selectedItem}
           onSuccess={handleItemUpdate}
         />
+        {/* Image Preview Dialog */}
+        <Dialog open={imageDialogOpen} onOpenChange={setImageDialogOpen}>
+          <DialogContent className="max-w-3xl" showCloseButton>
+            {selectedImageItem && selectedImageItem.image_URL && (
+              <>
+                <DialogHeader>
+                  <DialogTitle>{selectedImageItem.item_name}</DialogTitle>
+                </DialogHeader>
+                <div className="mt-2 flex justify-center">
+                  <img
+                    src={selectedImageItem.image_URL}
+                    alt={selectedImageItem.item_name}
+                    className="max-h-[70vh] w-auto rounded-md object-contain"
+                  />
+                </div>
+              </>
+            )}
+          </DialogContent>
+        </Dialog>
       </div>
     );
   }
@@ -505,6 +598,25 @@ export function InventoryTable({ items, stickyControls = false, maxHeight = "non
         item={selectedItem}
         onSuccess={handleItemUpdate}
       />
+      {/* Image Preview Dialog */}
+      <Dialog open={imageDialogOpen} onOpenChange={setImageDialogOpen}>
+        <DialogContent className="max-w-3xl" showCloseButton>
+          {selectedImageItem && selectedImageItem.image_URL && (
+            <>
+              <DialogHeader>
+                <DialogTitle>{selectedImageItem.item_name}</DialogTitle>
+              </DialogHeader>
+              <div className="mt-2 flex justify-center">
+                <img
+                  src={selectedImageItem.image_URL}
+                  alt={selectedImageItem.item_name}
+                  className="max-h-[70vh] w-auto rounded-md object-contain"
+                />
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
