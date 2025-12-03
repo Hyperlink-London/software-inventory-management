@@ -1,5 +1,6 @@
 "use client";
 import { createClient } from "@/utils/supabase/client";
+import { Github } from "lucide-react";
 
 export default function GitHubSignInButton() {
   async function handleLogin() {
@@ -32,8 +33,9 @@ export default function GitHubSignInButton() {
   return (
     <button
       onClick={handleLogin}
-      className="flex h-12 w-full items-center justify-center gap-2 rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[200px]"
+      className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg text-base font-semibold ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#24292F] h-10 px-6 py-2 bg-[#24292F] hover:bg-[#1f2327] text-white shadow-lg"
     >
+      <Github className="h-5 w-5" />
       <span>Sign in with GitHub</span>
     </button>
   );

@@ -5,10 +5,12 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
-import { UserProvider } from "@/contexts/UserContext";
+import { UserProvider, useUser } from "@/contexts/UserContext";
+import GitHubSignInButton from "./GitHubSignInButton";
+import { Toaster } from "sonner";
 
 // Note: Fonts/Metadata definition should ideally stay outside the client component
-// but must be included here since the whole layout is now client-side.
+// but must be included here since the whole component is now client-side.
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
@@ -28,20 +30,63 @@ const geistMono = Geist_Mono({
 };
 */
 
+// Hook alias for compatibility with previous code
+function useAuth() {
+  const { user, loading } = useUser();
+  return { user, isLoading: loading };
+}
+
+// Component that renders the login screen
+const LoginScreen = () => (
+  <div className="flex flex-col items-center justify-center min-h-[calc(100vh-200px)] px-4">
+    <div className="space-y-6 p-8 text-center max-w-sm w-full border rounded-xl shadow-lg dark:border-zinc-700">
+      <h1 className="text-3xl font-bold text-red-600 dark:text-red-400">Please Sign In</h1>
+      <p className="text-lg text-zinc-600 dark:text-zinc-400">
+        You must be logged in to view this application.
+      </p>
+      <GitHubSignInButton />
+    </div>
+  </div>
+);
+
+function LayoutContent({ children }: { children: React.ReactNode }) {
+  const { user, isLoading } = useAuth();
+  
+  let content;
+  if (isLoading) {
+    content = (
+      <div className="space-y-6 p-8 text-center">
+        <h1 className="text-2xl font-semibold">Checking session...</h1>
+      </div>
+    );
+  } else if (!user) {
+    content = <LoginScreen />;
+  } else {
+    content = children;
+  }
+
+  return (
+    <>
+      <Navbar />
+      <main className="mx-auto w-full max-w-6xl px-3 sm:px-4 py-4 sm:py-8">{content}</main>
+      <Footer />
+    </>
+  );
+}
+
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" className="dark">
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <UserProvider>
-        <Navbar />
-        <main className="mx-auto w-full max-w-6xl px-4 py-8">{children}</main>
-        <Footer />
+          <LayoutContent>{children}</LayoutContent>
+          <Toaster position="top-right" richColors />
         </UserProvider>
       </body>
     </html>
