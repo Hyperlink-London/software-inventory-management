@@ -49,7 +49,11 @@ type AddItemDialogProps = {
   onSuccess?: () => void;
 };
 
-export function AddItemDialog({ open, onOpenChange, onSuccess }: AddItemDialogProps) {
+export function AddItemDialog({
+  open,
+  onOpenChange,
+  onSuccess,
+}: AddItemDialogProps) {
   const { user, loading } = useUser();
 
   const [formData, setFormData] = useState<ItemData>({
@@ -125,8 +129,28 @@ export function AddItemDialog({ open, onOpenChange, onSuccess }: AddItemDialogPr
     }));
   };
 
+  const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2MB
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files ? e.target.files[0] : null;
+
+    if (!file) return;
+
+    // Validate type
+    if (!file.type.startsWith("image/")) {
+      alert("Please select a valid image file.");
+      e.target.value = ""; // Clear invalid file
+      return;
+    }
+
+    // Validate size
+    if (file.size > MAX_FILE_SIZE) {
+      alert("Image must be under 2MB.");
+      e.target.value = ""; // Clear invalid file
+      return;
+    }
+
+    // Passed validation
     setFormData((prev) => ({
       ...prev,
       image: file,
@@ -211,11 +235,11 @@ export function AddItemDialog({ open, onOpenChange, onSuccess }: AddItemDialogPr
         // First, ensure all tags exist in the tags table
         // Tags that are IDs already exist, tags that are names need to be created
         const tagIdsToLink: string[] = [];
-        
+
         for (const tagIdOrName of formData.tags) {
           // Check if it's an existing tag ID (UUID format) or a new tag name
-          const existingTag = availableTags.find(t => t.id === tagIdOrName);
-          
+          const existingTag = availableTags.find((t) => t.id === tagIdOrName);
+
           if (existingTag) {
             // It's an existing tag ID, use it directly
             tagIdsToLink.push(existingTag.id);
@@ -226,7 +250,7 @@ export function AddItemDialog({ open, onOpenChange, onSuccess }: AddItemDialogPr
               .insert([{ name: tagIdOrName }])
               .select()
               .single();
-            
+
             if (newTagError) {
               console.error("Failed to create new tag:", newTagError);
               // Try to find if tag was created by another process
@@ -235,7 +259,7 @@ export function AddItemDialog({ open, onOpenChange, onSuccess }: AddItemDialogPr
                 .select("id")
                 .eq("name", tagIdOrName)
                 .single();
-              
+
               if (foundTag) {
                 tagIdsToLink.push(foundTag.id);
               } else {
@@ -282,7 +306,7 @@ export function AddItemDialog({ open, onOpenChange, onSuccess }: AddItemDialogPr
       });
 
       onOpenChange(false);
-      
+
       // Call onSuccess callback to refresh the page
       if (onSuccess) {
         onSuccess();
@@ -372,7 +396,11 @@ export function AddItemDialog({ open, onOpenChange, onSuccess }: AddItemDialogPr
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={isSubmitting} className="w-full sm:w-auto h-11 sm:h-10">
+            <Button
+              type="submit"
+              disabled={isSubmitting}
+              className="w-full sm:w-auto h-11 sm:h-10"
+            >
               {isSubmitting ? "Adding..." : "Add Item"}
             </Button>
           </DialogFooter>
@@ -381,4 +409,3 @@ export function AddItemDialog({ open, onOpenChange, onSuccess }: AddItemDialogPr
     </Dialog>
   );
 }
-
