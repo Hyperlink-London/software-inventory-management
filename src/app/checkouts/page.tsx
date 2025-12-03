@@ -23,18 +23,18 @@ type CheckoutItem = {
 export default async function CheckoutsPage() {
   const supabase = await createClient(cookies());
   const {
-    data: { session },
-  } = await supabase.auth.getSession();
+    data: { user },
+  } = await supabase.auth.getUser();
 
   // Fetch user profile ID and teams
   let userProfileId = null;
   let userTeams: string[] = [];
-  if (session?.user?.id) {
+  if (user?.id) {
     try {
       const { data: profile, error: profileError } = await supabase
         .from("profiles")
         .select("id, teams")
-        .eq("supabase_uid", session.user.id)
+        .eq("supabase_uid", user.id)
         .is("deleted_at", null)
         .single();
       
@@ -45,7 +45,7 @@ export default async function CheckoutsPage() {
           const { data: profileWithoutTeams } = await supabase
             .from("profiles")
             .select("id")
-            .eq("supabase_uid", session.user.id)
+            .eq("supabase_uid", user.id)
             .is("deleted_at", null)
             .single();
           userProfileId = profileWithoutTeams?.id || null;
@@ -63,7 +63,7 @@ export default async function CheckoutsPage() {
 
   // Fetch checkouts
   let checkouts: CheckoutItem[] = [];
-  if (session) {
+  if (user) {
     // Try to fetch with teams first
     let checkoutsData: any[] | null = null;
     let checkoutsError: any = null;

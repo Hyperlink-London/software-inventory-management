@@ -21,12 +21,12 @@ type ItemWithTags = {
 export default async function ItemsPage() {
   const supabase = await createClient(cookies());
   const {
-    data: { session },
-  } = await supabase.auth.getSession();
+    data: { user },
+  } = await supabase.auth.getUser();
 
   // Fetch items with their tags
   let items: ItemWithTags[] = [];
-  if (session) {
+  if (user) {
     const { data: itemsData, error: itemsError } = await supabase
       .from("items")
       .select(`

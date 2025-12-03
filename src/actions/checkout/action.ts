@@ -13,12 +13,12 @@ export type CheckoutInput = {
 export async function checkoutItem(input: CheckoutInput) {
   const supabase = await createClient(cookies());
   
-  // Get current session
+  // Get current user
   const {
-    data: { session },
-  } = await supabase.auth.getSession();
+    data: { user },
+  } = await supabase.auth.getUser();
 
-  if (!session) {
+  if (!user) {
     throw new Error("You must be logged in to checkout items");
   }
 
@@ -26,7 +26,7 @@ export async function checkoutItem(input: CheckoutInput) {
   const { data: profile, error: profileError } = await supabase
     .from("profiles")
     .select("id")
-    .eq("supabase_uid", session.user.id)
+    .eq("supabase_uid", user.id)
     .is("deleted_at", null)
     .single();
 
@@ -75,7 +75,24 @@ export async function checkoutItem(input: CheckoutInput) {
 
   if (updateError) {
     // Rollback checkout if quantity update fails
-    await supabase.from("itemsignouts").delete().eq("id", checkout.id);
+    const { error: rollbackError } = await supabase
+      .from("itemsignouts")
+      .delete()
+      .eq("id", checkout.id);
+    
+    if (rollbackError) {
+      // Log the rollback failure - this is a critical data integrity issue
+      console.error(
+        `CRITICAL: Failed to rollback checkout after quantity update failure. ` +
+        `Checkout ID: ${checkout.id}, Rollback error: ${rollbackError.message}`
+      );
+      throw new Error(
+        `Failed to update item quantity: ${updateError.message}. ` +
+        `Additionally, failed to rollback checkout record (ID: ${checkout.id}). ` +
+        `Database may be in inconsistent state. Please contact support.`
+      );
+    }
+    
     throw new Error(`Failed to update item quantity: ${updateError.message}`);
   }
 

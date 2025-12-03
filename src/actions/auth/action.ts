@@ -27,9 +27,8 @@ export const signInAction = async (formData: FormData) => {
 
   // Verify session was created
   const { data: { user }, error: userError } = await supabase.auth.getUser();
-  const { data: { session } } = await supabase.auth.getSession();
 
-  if (!user && !session) {
+  if (!user) {
     return encodedRedirect("error", "/login", "Failed to create session");
   }
 

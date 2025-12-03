@@ -24,19 +24,19 @@ type ItemWithTags = {
 export default async function Dashboard() {
   const supabase = await createClient(cookies());
   const {
-    data: { session },
-  } = await supabase.auth.getSession();
+    data: { user },
+  } = await supabase.auth.getUser();
 
   // Fetch user profile from profiles table
   let username = null;
   let userProfileId = null;
   let userTeams: string[] = [];
-  if (session?.user?.id) {
+  if (user?.id) {
     try {
       const { data: profile, error: profileError } = await supabase
         .from("profiles")
         .select("id, username, teams")
-        .eq("supabase_uid", session.user.id)
+        .eq("supabase_uid", user.id)
         .is("deleted_at", null)
         .single();
       
@@ -47,7 +47,7 @@ export default async function Dashboard() {
           const { data: profileWithoutTeams } = await supabase
             .from("profiles")
             .select("id, username")
-            .eq("supabase_uid", session.user.id)
+            .eq("supabase_uid", user.id)
             .is("deleted_at", null)
             .single();
           username = profileWithoutTeams?.username || null;
@@ -67,7 +67,7 @@ export default async function Dashboard() {
 
   // Fetch items with their tags
   let items: ItemWithTags[] = [];
-  if (session) {
+  if (user) {
     const { data: itemsData, error: itemsError } = await supabase
       .from("items")
       .select(`
@@ -120,7 +120,7 @@ type CheckoutItem = {
 };
 
   let checkouts: CheckoutItem[] = [];
-  if (session) {
+  if (user) {
     // Try to fetch with teams first
     let checkoutsData: any[] | null = null;
     let checkoutsError: any = null;
@@ -195,7 +195,7 @@ type CheckoutItem = {
     }
   }
 
-  // Middleware already handles auth redirects, so we can trust we have a session here
+  // Middleware already handles auth redirects, so we can trust we have a user here
   return (
     <div className="space-y-6 w-full">
       <div className="space-y-2 text-center sm:text-left">

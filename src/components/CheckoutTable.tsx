@@ -67,9 +67,11 @@ const statusOptions: { value: StatusFilter; label: string }[] = [
 
 export function CheckoutTable({ checkouts, currentUserId, userTeams = [] }: CheckoutTableProps) {
   const [viewMode, setViewMode] = React.useState<"yours" | "everyone" | "team">("yours");
+  const [selectedTeam, setSelectedTeam] = React.useState<string | null>(null);
   const [statusFilter, setStatusFilter] = React.useState<StatusFilter>("all");
   const [searchQuery, setSearchQuery] = React.useState("");
   const [filterOpen, setFilterOpen] = React.useState(false);
+  const [teamFilterOpen, setTeamFilterOpen] = React.useState(false);
   const [checkingIn, setCheckingIn] = React.useState<string | null>(null);
   const [mounted, setMounted] = React.useState(false);
 
@@ -79,20 +81,6 @@ export function CheckoutTable({ checkouts, currentUserId, userTeams = [] }: Chec
   }, []);
 
   const filteredAndSortedCheckouts = React.useMemo(() => {
-    // Debug logging
-    if (viewMode === "team") {
-      console.log("Team Checkouts Debug:", {
-        userTeams,
-        userTeamsLength: userTeams.length,
-        totalCheckouts: checkouts.length,
-        checkoutsWithTeams: checkouts.map(c => ({
-          id: c.id,
-          recipient: c.recipient_username,
-          recipientTeams: c.recipient_teams || [],
-        })),
-      });
-    }
-
     // First filter by view mode (yours vs everyone vs team)
     let filtered = checkouts;
     if (viewMode === "yours" && currentUserId) {
@@ -101,24 +89,40 @@ export function CheckoutTable({ checkouts, currentUserId, userTeams = [] }: Chec
       // Show all checkouts
       filtered = checkouts;
     } else if (viewMode === "team") {
-      // Team checkouts - only show checkouts from users in the same team(s)
+      // Team checkouts - show checkouts from users in the selected team
       if (userTeams.length > 0) {
+        // Normalize user teams (handle nulls, trim whitespace, ensure strings)
+        const normalizedUserTeams = userTeams
+          .filter((team): team is string => team != null && typeof team === 'string')
+          .map(team => team.trim())
+          .filter(team => team.length > 0);
+        
+        // If a specific team is selected, filter by that team only
+        // Otherwise, show checkouts from all teams the user belongs to
+        const teamsToFilter = selectedTeam 
+          ? [selectedTeam.trim()] 
+          : normalizedUserTeams;
+        
         filtered = checkouts.filter((checkout) => {
           const recipientTeams = checkout.recipient_teams || [];
-          // Check if recipient has any team in common with current user
-          const hasCommonTeam = recipientTeams.some((team) => userTeams.includes(team));
-          console.log(`Checking checkout ${checkout.id}:`, {
-            recipient: checkout.recipient_username,
-            recipientTeams,
-            userTeams,
-            hasCommonTeam,
-          });
-          return hasCommonTeam;
+          
+          // Normalize recipient teams (handle arrays, nulls, ensure strings)
+          const normalizedRecipientTeams = Array.isArray(recipientTeams)
+            ? recipientTeams
+                .filter((team): team is string => team != null && typeof team === 'string')
+                .map(team => team.trim())
+                .filter(team => team.length > 0)
+            : [];
+          
+          // Check if recipient belongs to any of the teams we're filtering by
+          const hasMatchingTeam = normalizedRecipientTeams.some((recipientTeam) => 
+            teamsToFilter.includes(recipientTeam)
+          );
+          
+          return hasMatchingTeam;
         });
-        console.log(`Filtered ${filtered.length} team checkouts from ${checkouts.length} total`);
       } else {
         // User has no teams, show empty
-        console.log("User has no teams, showing empty list");
         filtered = [];
       }
     }
@@ -162,7 +166,7 @@ export function CheckoutTable({ checkouts, currentUserId, userTeams = [] }: Chec
       const bDate = bReturned ? b.returned_date! : b.sign_out_date;
       return new Date(bDate).getTime() - new Date(aDate).getTime();
     });
-  }, [checkouts, viewMode, currentUserId, statusFilter, searchQuery, userTeams]);
+  }, [checkouts, viewMode, currentUserId, statusFilter, searchQuery, userTeams, selectedTeam]);
 
   // Separate active and returned checkouts
   const activeCheckouts = React.useMemo(
@@ -210,7 +214,17 @@ export function CheckoutTable({ checkouts, currentUserId, userTeams = [] }: Chec
   const clearFilters = () => {
     setStatusFilter("all");
     setSearchQuery("");
+    setSelectedTeam(null);
   };
+
+  // Normalize and sort user teams for display
+  const normalizedUserTeams = React.useMemo(() => {
+    return userTeams
+      .filter((team): team is string => team != null && typeof team === 'string')
+      .map(team => team.trim())
+      .filter(team => team.length > 0)
+      .sort();
+  }, [userTeams]);
 
   const getStatusLabel = (status: StatusFilter) => {
     return statusOptions.find((opt) => opt.value === status)?.label || "All";
@@ -234,18 +248,83 @@ export function CheckoutTable({ checkouts, currentUserId, userTeams = [] }: Chec
         >
           Everyone Checkouts
         </Button>
-        <Button
-          variant={viewMode === "team" ? "default" : "outline"}
-          onClick={() => setViewMode("team")}
-          className="flex-1 sm:flex-initial"
-        >
-          Team Checkouts
-          {userTeams.length > 0 && (
-            <Badge variant="secondary" className="ml-2">
-              {userTeams.length}
-            </Badge>
-          )}
-        </Button>
+        {mounted && normalizedUserTeams.length > 0 ? (
+          <Popover open={teamFilterOpen} onOpenChange={setTeamFilterOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                variant={viewMode === "team" ? "default" : "outline"}
+                onClick={() => {
+                  setViewMode("team");
+                  if (!teamFilterOpen) {
+                    setTeamFilterOpen(true);
+                  }
+                }}
+                className="flex-1 sm:flex-initial"
+              >
+                Team Checkouts
+                {selectedTeam && (
+                  <Badge variant="secondary" className="ml-2">
+                    {selectedTeam}
+                  </Badge>
+                )}
+                {!selectedTeam && normalizedUserTeams.length > 0 && (
+                  <Badge variant="secondary" className="ml-2">
+                    All ({normalizedUserTeams.length})
+                  </Badge>
+                )}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-[250px] p-0" align="start">
+              <Command>
+                <CommandInput placeholder="Search teams..." />
+                <CommandList>
+                  <CommandEmpty>No teams found.</CommandEmpty>
+                  <CommandGroup>
+                    <CommandItem
+                      onSelect={() => {
+                        setSelectedTeam(null);
+                        setViewMode("team");
+                        setTeamFilterOpen(false);
+                      }}
+                      className="flex items-center justify-between"
+                    >
+                      <span>All Teams</span>
+                      {!selectedTeam && <CheckCircle className="h-4 w-4" />}
+                    </CommandItem>
+                    {normalizedUserTeams.map((team) => (
+                      <CommandItem
+                        key={team}
+                        onSelect={() => {
+                          setSelectedTeam(team);
+                          setViewMode("team");
+                          setTeamFilterOpen(false);
+                        }}
+                        className="flex items-center justify-between"
+                      >
+                        <span>{team}</span>
+                        {selectedTeam === team && <CheckCircle className="h-4 w-4" />}
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+                </CommandList>
+              </Command>
+            </PopoverContent>
+          </Popover>
+        ) : (
+          <Button
+            variant={viewMode === "team" ? "default" : "outline"}
+            onClick={() => setViewMode("team")}
+            className="flex-1 sm:flex-initial"
+            disabled={normalizedUserTeams.length === 0}
+          >
+            Team Checkouts
+            {normalizedUserTeams.length === 0 && (
+              <Badge variant="secondary" className="ml-2">
+                No teams
+              </Badge>
+            )}
+          </Button>
+        )}
       </div>
 
       {/* Search and Filter Bar */}
@@ -309,7 +388,7 @@ export function CheckoutTable({ checkouts, currentUserId, userTeams = [] }: Chec
             )}
           </Button>
         )}
-        {(statusFilter !== "all" || searchQuery) && (
+        {(statusFilter !== "all" || searchQuery || selectedTeam) && (
           <Button variant="ghost" onClick={clearFilters} className="w-full sm:w-auto">
             <X className="mr-2 h-4 w-4" />
             Clear
@@ -318,8 +397,8 @@ export function CheckoutTable({ checkouts, currentUserId, userTeams = [] }: Chec
       </div>
 
       {/* Selected Filter Display */}
-      {statusFilter !== "all" && (
-        <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-2">
+        {statusFilter !== "all" && (
           <Badge
             variant="secondary"
             className="cursor-pointer"
@@ -328,19 +407,32 @@ export function CheckoutTable({ checkouts, currentUserId, userTeams = [] }: Chec
             {getStatusLabel(statusFilter)}
             <X className="ml-1 h-3 w-3" />
           </Badge>
-        </div>
-      )}
+        )}
+        {selectedTeam && viewMode === "team" && (
+          <Badge
+            variant="secondary"
+            className="cursor-pointer"
+            onClick={() => setSelectedTeam(null)}
+          >
+            Team: {selectedTeam}
+            <X className="ml-1 h-3 w-3" />
+          </Badge>
+        )}
+      </div>
 
-      {/* Team Info (for debugging) */}
+      {/* Team Info */}
       {viewMode === "team" && (
         <div className="text-xs text-muted-foreground p-2 bg-muted rounded-md">
-          {userTeams.length === 0 ? (
+          {normalizedUserTeams.length === 0 ? (
             <span className="text-amber-600 dark:text-amber-400">
               ⚠️ You have no teams assigned. Teams are fetched from GitHub during login.
             </span>
           ) : (
             <span>
-              Your teams: <strong>{userTeams.join(", ")}</strong>
+              {selectedTeam 
+                ? `Showing checkouts from team: ${selectedTeam}`
+                : `Showing checkouts from all your teams: ${normalizedUserTeams.join(", ")}`
+              }
             </span>
           )}
         </div>
@@ -348,11 +440,13 @@ export function CheckoutTable({ checkouts, currentUserId, userTeams = [] }: Chec
 
       {/* Results Count */}
       <div className="text-sm text-muted-foreground">
-        {viewMode === "yours"
-          ? `Showing ${filteredAndSortedCheckouts.length} of your checkout${filteredAndSortedCheckouts.length !== 1 ? "s" : ""}`
-          : viewMode === "everyone"
-          ? `Showing ${filteredAndSortedCheckouts.length} checkout${filteredAndSortedCheckouts.length !== 1 ? "s" : ""}`
-          : `Showing ${filteredAndSortedCheckouts.length} team checkout${filteredAndSortedCheckouts.length !== 1 ? "s" : ""}`}
+          {viewMode === "yours"
+            ? `Showing ${filteredAndSortedCheckouts.length} of your checkout${filteredAndSortedCheckouts.length !== 1 ? "s" : ""}`
+            : viewMode === "everyone"
+            ? `Showing ${filteredAndSortedCheckouts.length} checkout${filteredAndSortedCheckouts.length !== 1 ? "s" : ""}`
+            : selectedTeam
+            ? `Showing ${filteredAndSortedCheckouts.length} checkout${filteredAndSortedCheckouts.length !== 1 ? "s" : ""} from ${selectedTeam}`
+            : `Showing ${filteredAndSortedCheckouts.length} team checkout${filteredAndSortedCheckouts.length !== 1 ? "s" : ""} from all your teams`}
       </div>
 
       {/* Table */}
@@ -362,8 +456,10 @@ export function CheckoutTable({ checkouts, currentUserId, userTeams = [] }: Chec
             ? "You have no checkouts matching the selected filters."
             : viewMode === "everyone"
             ? "No checkouts found matching the selected filters."
-            : userTeams.length === 0
+            : normalizedUserTeams.length === 0
             ? "You have no teams assigned. Teams are fetched from GitHub during login. Please check that GITHUB_ORG_NAME is set and you've logged in recently."
+            : selectedTeam
+            ? `No checkouts found for team "${selectedTeam}".`
             : "No team checkouts found. This means no other users in your teams have any checkouts."}
         </div>
       ) : (
