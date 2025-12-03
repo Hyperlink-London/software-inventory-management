@@ -563,7 +563,7 @@ export function InventoryTable({
                     </TableCell>
                     <TableCell>
                       <div className="flex gap-2">
-                        {isUserAdmin && (
+                        {(isUserAdmin || profileID == item.created_by) && (
                           <Button
                             variant="outline"
                             size="sm"

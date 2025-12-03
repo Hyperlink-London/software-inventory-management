@@ -15,6 +15,7 @@ type ItemWithTags = {
   quantity: number;
   notes: string | null;
   image_URL: string | null;
+  created_by: string | null;
   tags: Array<{
     id: string;
     name: string;

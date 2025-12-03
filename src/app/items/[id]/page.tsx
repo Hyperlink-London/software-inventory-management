@@ -16,7 +16,6 @@ type ItemWithTags = {
   tags: Array<{
     id: string;
     name: string;
-    s;
   }>;
 };
 
