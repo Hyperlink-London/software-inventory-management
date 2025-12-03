@@ -39,11 +39,14 @@ export default async function Dashboard() {
         .eq("supabase_uid", user.id)
         .is("deleted_at", null)
         .single();
-      
+
       if (profileError) {
         console.error("Error fetching profile:", profileError);
         // If teams column doesn't exist, try without it
-        if (profileError.message?.includes("column") && profileError.message?.includes("teams")) {
+        if (
+          profileError.message?.includes("column") &&
+          profileError.message?.includes("teams")
+        ) {
           const { data: profileWithoutTeams } = await supabase
             .from("profiles")
             .select("id, username")
@@ -53,7 +56,9 @@ export default async function Dashboard() {
           username = profileWithoutTeams?.username || null;
           userProfileId = profileWithoutTeams?.id || null;
           userTeams = [];
-          console.warn("⚠️ Teams column not found. Please run migration: migrations/add_teams_to_profiles.sql");
+          console.warn(
+            "⚠️ Teams column not found. Please run migration: migrations/add_teams_to_profiles.sql",
+          );
         }
       } else {
         username = profile?.username || null;
@@ -70,19 +75,22 @@ export default async function Dashboard() {
   if (user) {
     const { data: itemsData, error: itemsError } = await supabase
       .from("items")
-      .select(`
+      .select(
+        `
         id,
         item_name,
         quantity,
         notes,
         image_URL,
+        created_by,
         itemtags(
           tags(
             id,
             name
           )
         )
-      `)
+      `,
+      )
       .is("deleted_at", null)
       .order("item_name", { ascending: true });
 
@@ -94,6 +102,7 @@ export default async function Dashboard() {
         quantity: item.quantity,
         notes: item.notes,
         image_URL: item.image_URL,
+        created_by: item.created_by,
         tags: (item.itemtags || [])
           .filter((it: any) => it.tags && !it.tags.deleted_at && !it.deleted_at)
           .map((it: any) => ({
@@ -105,29 +114,30 @@ export default async function Dashboard() {
   }
 
   // Fetch checkouts
-type CheckoutItem = {
-  id: string;
-  item_id: string;
-  item_name: string;
-  image_URL: string | null;
-  quantity: number;
-  sign_out_date: string;
-  expected_return_date: string | null;
-  returned_date: string | null;
-  recipient_username: string;
-  recipient_id: string;
-  recipient_teams?: string[];
-};
+  type CheckoutItem = {
+    id: string;
+    item_id: string;
+    item_name: string;
+    image_URL: string | null;
+    quantity: number;
+    sign_out_date: string;
+    expected_return_date: string | null;
+    returned_date: string | null;
+    recipient_username: string;
+    recipient_id: string;
+    recipient_teams?: string[];
+  };
 
   let checkouts: CheckoutItem[] = [];
   if (user) {
     // Try to fetch with teams first
     let checkoutsData: any[] | null = null;
     let checkoutsError: any = null;
-    
+
     const { data, error } = await supabase
       .from("itemsignouts")
-      .select(`
+      .select(
+        `
         id,
         item_id,
         quantity,
@@ -143,7 +153,8 @@ type CheckoutItem = {
           username,
           teams
         )
-      `)
+      `,
+      )
       .is("deleted_at", null)
       .order("sign_out_date", { ascending: false });
 
@@ -151,11 +162,19 @@ type CheckoutItem = {
     checkoutsError = error;
 
     // If error is about teams column, try without it
-    if (checkoutsError && checkoutsError.message?.includes("column") && checkoutsError.message?.includes("teams")) {
-      console.warn("⚠️ Teams column not found in profiles. Fetching checkouts without teams. Please run migration: migrations/add_teams_to_profiles.sql");
-      const { data: dataWithoutTeams, error: errorWithoutTeams } = await supabase
-        .from("itemsignouts")
-        .select(`
+    if (
+      checkoutsError &&
+      checkoutsError.message?.includes("column") &&
+      checkoutsError.message?.includes("teams")
+    ) {
+      console.warn(
+        "⚠️ Teams column not found in profiles. Fetching checkouts without teams. Please run migration: migrations/add_teams_to_profiles.sql",
+      );
+      const { data: dataWithoutTeams, error: errorWithoutTeams } =
+        await supabase
+          .from("itemsignouts")
+          .select(
+            `
           id,
           item_id,
           quantity,
@@ -170,10 +189,11 @@ type CheckoutItem = {
           profiles(
             username
           )
-        `)
-        .is("deleted_at", null)
-        .order("sign_out_date", { ascending: false });
-      
+        `,
+          )
+          .is("deleted_at", null)
+          .order("sign_out_date", { ascending: false });
+
       checkoutsData = dataWithoutTeams;
       checkoutsError = errorWithoutTeams;
     }
@@ -199,12 +219,14 @@ type CheckoutItem = {
   return (
     <div className="space-y-6 w-full">
       <div className="space-y-2 text-center sm:text-left">
-        <h1 className="text-4xl font-bold tracking-tight">
-          Dashboard
-        </h1>
+        <h1 className="text-4xl font-bold tracking-tight">Dashboard</h1>
       </div>
 
-      <CollapsibleCheckoutCard checkouts={checkouts} currentUserId={userProfileId} userTeams={userTeams} />
+      <CollapsibleCheckoutCard
+        checkouts={checkouts}
+        currentUserId={userProfileId}
+        userTeams={userTeams}
+      />
 
       <Card className="w-full">
         <CardHeader className="py-3 px-3 sm:px-6">
@@ -215,7 +237,11 @@ type CheckoutItem = {
             </div>
             {items.length > 0 && (
               <Link href="/items" className="w-full sm:w-auto">
-                <Button variant="outline" size="sm" className="h-9 sm:h-8 w-full sm:w-auto text-sm">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-9 sm:h-8 w-full sm:w-auto text-sm"
+                >
                   <ExternalLink className="mr-2 h-3 w-3" />
                   View All
                 </Button>
