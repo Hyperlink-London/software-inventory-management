@@ -297,7 +297,7 @@ export function AddItemDialog({ open, onOpenChange, onSuccess }: AddItemDialogPr
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto w-[calc(100vw-1rem)] sm:w-full">
+      <DialogContent className="max-w-lg max-h-[95vh] overflow-y-auto w-[calc(100vw-1rem)] sm:w-full p-4 sm:p-6">
         <DialogHeader>
           <DialogTitle>Add New Item</DialogTitle>
           <DialogDescription>

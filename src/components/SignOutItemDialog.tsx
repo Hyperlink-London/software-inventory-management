@@ -30,7 +30,7 @@ export default function SignOutItemDialog({
       className="rounded-lg border border-zinc-200 dark:border-zinc-800 p-0 backdrop:bg-black/50"
       onClose={() => onOpenChange(false)}
     >
-      <div className="p-6 w-[90vw] max-w-md bg-white dark:bg-zinc-900 rounded-lg">
+      <div className="p-4 sm:p-6 w-[calc(100vw-1rem)] sm:w-[90vw] max-w-md bg-white dark:bg-zinc-900 rounded-lg">
         <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100 mb-2">Sign Out Item</h2>
         <p className="text-sm text-zinc-600 dark:text-zinc-400 mb-6">
           {`Are you sure you want to sign out${itemName ? ` \"${itemName}\"` : ""}?`}

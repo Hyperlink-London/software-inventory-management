@@ -7,11 +7,18 @@ import { LogoutButton } from "@/components/LogoutButton";
 import { useUser } from "@/contexts/UserContext";
 import { createClient } from "@/utils/supabase/client";
 import { cn } from "@/lib/utils";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { ChevronDown, LayoutDashboard, Package, ShoppingCart } from "lucide-react";
 
 export default function Navbar() {
   const { user } = useUser();
   const [username, setUsername] = React.useState<string | null>(null);
   const [isScrolled, setIsScrolled] = React.useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
 
   React.useEffect(() => {
     async function fetchUsername() {
@@ -46,33 +53,35 @@ export default function Navbar() {
   return (
     <header
       className={cn(
-        "sticky top-0 z-50 transition-all duration-500 ease-in-out",
+        "sticky top-0 z-50 transition-all duration-500 ease-in-out bg-background/95 backdrop-blur-md border-b border-border",
         isScrolled
           ? "py-2"
-          : "py-3 border-b border-border"
+          : "py-3"
       )}
     >
       <div
         className={cn(
           "mx-auto transition-all duration-500 ease-in-out",
           isScrolled
-            ? "max-w-3xl px-8 py-3 rounded-full bg-background/95 backdrop-blur-md border border-border shadow-lg"
-            : "w-full max-w-6xl px-4 bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60"
+            ? "max-w-3xl px-4 sm:px-8 py-3 rounded-full bg-background/95 backdrop-blur-md border border-border shadow-lg"
+            : "w-full max-w-6xl px-3 sm:px-4 bg-transparent"
         )}
       >
         <div
           className={cn(
             "flex items-center transition-all duration-500",
-            "justify-between gap-3"
+            "justify-between gap-2 sm:gap-3"
           )}
         >
           <Link
             href="/"
-            className="text-lg font-semibold text-foreground hover:opacity-80 transition-opacity"
+            className="text-base sm:text-lg font-semibold text-foreground hover:opacity-80 transition-opacity truncate"
           >
             Hyperlink Inventory
           </Link>
-          <nav className="flex items-center gap-3 flex-1 justify-center">
+          
+          {/* Desktop Navigation */}
+          <nav className="hidden md:flex items-center gap-3 flex-1 justify-center">
             <Button variant="ghost" size="sm" asChild className={isScrolled ? "h-9 px-4" : ""}>
               <Link href="/">Dashboard</Link>
             </Button>
@@ -83,19 +92,88 @@ export default function Navbar() {
               <Link href="/checkouts">Checkouts</Link>
             </Button>
           </nav>
+
+          {/* Mobile & Desktop User Menu */}
           {username && (
-            <div className="group relative flex items-center">
-              <span
-                className="text-sm text-muted-foreground cursor-pointer hover:text-foreground transition-colors px-3 py-1.5 rounded-md hover:bg-accent"
-              >
-                {username}
-              </span>
-              <div className="absolute right-0 top-full mt-1 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
-                <div className="bg-popover border rounded-md shadow-md p-1">
-                  <LogoutButton />
+            <>
+              {/* Desktop: Hover dropdown */}
+              <div className="hidden md:block group relative flex items-center">
+                <span
+                  className="text-sm text-muted-foreground cursor-pointer hover:text-foreground transition-colors px-3 py-1.5 rounded-md hover:bg-accent"
+                >
+                  {username}
+                </span>
+                <div className="absolute right-0 top-full mt-1 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                  <div className="bg-popover border rounded-md shadow-md p-1">
+                    <LogoutButton />
+                  </div>
                 </div>
               </div>
-            </div>
+
+              {/* Mobile: Popover dropdown with all links */}
+              <Popover open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="md:hidden flex items-center gap-1.5 px-2 sm:px-3 h-9"
+                  >
+                    <span className="text-sm font-medium truncate max-w-[100px] sm:max-w-none">
+                      {username}
+                    </span>
+                    <ChevronDown className="h-4 w-4 shrink-0" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent 
+                  align="end" 
+                  className="w-56 p-2"
+                  sideOffset={8}
+                >
+                  <div className="flex flex-col gap-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      asChild
+                      className="justify-start w-full"
+                      onClick={() => setMobileMenuOpen(false)}
+                    >
+                      <Link href="/">
+                        <LayoutDashboard className="mr-2 h-4 w-4" />
+                        Dashboard
+                      </Link>
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      asChild
+                      className="justify-start w-full"
+                      onClick={() => setMobileMenuOpen(false)}
+                    >
+                      <Link href="/items">
+                        <Package className="mr-2 h-4 w-4" />
+                        Inventory
+                      </Link>
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      asChild
+                      className="justify-start w-full"
+                      onClick={() => setMobileMenuOpen(false)}
+                    >
+                      <Link href="/checkouts">
+                        <ShoppingCart className="mr-2 h-4 w-4" />
+                        Checkouts
+                      </Link>
+                    </Button>
+                    <div className="border-t border-border my-1" />
+                    <div className="px-2">
+                      <LogoutButton />
+                    </div>
+                  </div>
+                </PopoverContent>
+              </Popover>
+            </>
           )}
         </div>
       </div>

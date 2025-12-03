@@ -114,7 +114,7 @@ export function CheckoutDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[500px] w-[calc(100vw-1rem)] sm:w-full max-h-[95vh] overflow-y-auto p-4 sm:p-6">
         <DialogHeader>
           <DialogTitle>Checkout Item</DialogTitle>
           <DialogDescription>

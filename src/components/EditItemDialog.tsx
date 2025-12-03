@@ -373,7 +373,7 @@ export function EditItemDialog({ open, onOpenChange, item, onSuccess }: EditItem
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto w-[calc(100vw-1rem)] sm:w-full">
+      <DialogContent className="max-w-lg max-h-[95vh] overflow-y-auto w-[calc(100vw-1rem)] sm:w-full p-4 sm:p-6">
         <DialogHeader>
           <DialogTitle>Edit Item</DialogTitle>
           <DialogDescription>
@@ -482,7 +482,7 @@ export function EditItemDialog({ open, onOpenChange, item, onSuccess }: EditItem
 
       {/* Delete Confirmation Dialog */}
       <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
-        <DialogContent className="sm:max-w-md w-[calc(100vw-1rem)] sm:w-full">
+        <DialogContent className="sm:max-w-md w-[calc(100vw-1rem)] sm:w-full p-4 sm:p-6">
           <DialogHeader>
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-full bg-destructive/10">
