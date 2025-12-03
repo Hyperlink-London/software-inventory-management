@@ -12,9 +12,11 @@ type ItemWithTags = {
   quantity: number;
   notes: string | null;
   image_URL: string | null;
+  created_by: string | null;
   tags: Array<{
     id: string;
     name: string;
+    s;
   }>;
 };
 
@@ -56,7 +58,10 @@ export default async function ItemDetailPage({ params }: ItemDetailPageProps) {
       if (profileError) {
         console.error("Error fetching profile:", profileError);
         // If teams column doesn't exist, try without it
-        if (profileError.message?.includes("column") && profileError.message?.includes("teams")) {
+        if (
+          profileError.message?.includes("column") &&
+          profileError.message?.includes("teams")
+        ) {
           const { data: profileWithoutTeams } = await supabase
             .from("profiles")
             .select("id")
@@ -65,7 +70,9 @@ export default async function ItemDetailPage({ params }: ItemDetailPageProps) {
             .single();
           userProfileId = profileWithoutTeams?.id || null;
           userTeams = [];
-          console.warn("⚠️ Teams column not found. Please run migration: migrations/add_teams_to_profiles.sql");
+          console.warn(
+            "⚠️ Teams column not found. Please run migration: migrations/add_teams_to_profiles.sql",
+          );
         }
       } else {
         userProfileId = (profile?.id as string) || null;
@@ -86,6 +93,7 @@ export default async function ItemDetailPage({ params }: ItemDetailPageProps) {
         quantity,
         notes,
         image_URL,
+        created_by,
         itemtags(
           tags(
             id,
@@ -94,7 +102,7 @@ export default async function ItemDetailPage({ params }: ItemDetailPageProps) {
           ),
           deleted_at
         )
-      `
+      `,
     )
     .eq("id", id)
     .is("deleted_at", null)
@@ -117,6 +125,7 @@ export default async function ItemDetailPage({ params }: ItemDetailPageProps) {
     quantity: data.quantity,
     notes: data.notes,
     image_URL: data.image_URL,
+    created_by: data.created_by,
     tags: (data.itemtags || [])
       .filter((it: any) => it.tags && !it.tags.deleted_at && !it.deleted_at)
       .map((it: any) => ({
@@ -131,9 +140,11 @@ export default async function ItemDetailPage({ params }: ItemDetailPageProps) {
     let checkoutsData: any[] | null = null;
     let checkoutsError: any = null;
 
-    const { data: checkoutDataWithTeams, error: checkoutErrorWithTeams } = await supabase
-      .from("itemsignouts")
-      .select(`
+    const { data: checkoutDataWithTeams, error: checkoutErrorWithTeams } =
+      await supabase
+        .from("itemsignouts")
+        .select(
+          `
         id,
         item_id,
         quantity,
@@ -149,20 +160,31 @@ export default async function ItemDetailPage({ params }: ItemDetailPageProps) {
           username,
           teams
         )
-      `)
-      .eq("item_id", id)
-      .is("deleted_at", null)
-      .order("sign_out_date", { ascending: false });
+      `,
+        )
+        .eq("item_id", id)
+        .is("deleted_at", null)
+        .order("sign_out_date", { ascending: false });
 
     checkoutsData = checkoutDataWithTeams;
     checkoutsError = checkoutErrorWithTeams;
 
     // If error is about teams column, try without it
-    if (checkoutsError && checkoutsError.message?.includes("column") && checkoutsError.message?.includes("teams")) {
-      console.warn("⚠️ Teams column not found in profiles. Fetching checkouts without teams. Please run migration: migrations/add_teams_to_profiles.sql");
-      const { data: checkoutDataWithoutTeams, error: checkoutErrorWithoutTeams } = await supabase
+    if (
+      checkoutsError &&
+      checkoutsError.message?.includes("column") &&
+      checkoutsError.message?.includes("teams")
+    ) {
+      console.warn(
+        "⚠️ Teams column not found in profiles. Fetching checkouts without teams. Please run migration: migrations/add_teams_to_profiles.sql",
+      );
+      const {
+        data: checkoutDataWithoutTeams,
+        error: checkoutErrorWithoutTeams,
+      } = await supabase
         .from("itemsignouts")
-        .select(`
+        .select(
+          `
           id,
           item_id,
           quantity,
@@ -177,7 +199,8 @@ export default async function ItemDetailPage({ params }: ItemDetailPageProps) {
           profiles(
             username
           )
-        `)
+        `,
+        )
         .eq("item_id", id)
         .is("deleted_at", null)
         .order("sign_out_date", { ascending: false });
@@ -212,4 +235,3 @@ export default async function ItemDetailPage({ params }: ItemDetailPageProps) {
     />
   );
 }
-

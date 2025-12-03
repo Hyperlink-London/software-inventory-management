@@ -176,7 +176,7 @@ export async function getUserTeams() {
   return data?.teams ?? null;
 }
 
-export async function getUserPermissions() {
+export async function isAdmin() {
   const teams = await getUserTeams();
   if (!teams) return null;
 
