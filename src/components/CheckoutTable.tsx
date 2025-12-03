@@ -40,11 +40,13 @@ type CheckoutItem = {
   returned_date: string | null;
   recipient_username: string;
   recipient_id: string;
+  recipient_teams?: string[];
 };
 
 type CheckoutTableProps = {
   checkouts: CheckoutItem[];
   currentUserId: string | null;
+  userTeams?: string[];
 };
 
 type StatusFilter = "all" | "active" | "overdue" | "returned";
@@ -63,8 +65,8 @@ const statusOptions: { value: StatusFilter; label: string }[] = [
   { value: "returned", label: "Returned" },
 ];
 
-export function CheckoutTable({ checkouts, currentUserId }: CheckoutTableProps) {
-  const [viewMode, setViewMode] = React.useState<"yours" | "team">("yours");
+export function CheckoutTable({ checkouts, currentUserId, userTeams = [] }: CheckoutTableProps) {
+  const [viewMode, setViewMode] = React.useState<"yours" | "everyone" | "team">("yours");
   const [statusFilter, setStatusFilter] = React.useState<StatusFilter>("all");
   const [searchQuery, setSearchQuery] = React.useState("");
   const [filterOpen, setFilterOpen] = React.useState(false);
@@ -77,10 +79,48 @@ export function CheckoutTable({ checkouts, currentUserId }: CheckoutTableProps) 
   }, []);
 
   const filteredAndSortedCheckouts = React.useMemo(() => {
-    // First filter by view mode (yours vs team)
+    // Debug logging
+    if (viewMode === "team") {
+      console.log("Team Checkouts Debug:", {
+        userTeams,
+        userTeamsLength: userTeams.length,
+        totalCheckouts: checkouts.length,
+        checkoutsWithTeams: checkouts.map(c => ({
+          id: c.id,
+          recipient: c.recipient_username,
+          recipientTeams: c.recipient_teams || [],
+        })),
+      });
+    }
+
+    // First filter by view mode (yours vs everyone vs team)
     let filtered = checkouts;
     if (viewMode === "yours" && currentUserId) {
       filtered = checkouts.filter((checkout) => checkout.recipient_id === currentUserId);
+    } else if (viewMode === "everyone") {
+      // Show all checkouts
+      filtered = checkouts;
+    } else if (viewMode === "team") {
+      // Team checkouts - only show checkouts from users in the same team(s)
+      if (userTeams.length > 0) {
+        filtered = checkouts.filter((checkout) => {
+          const recipientTeams = checkout.recipient_teams || [];
+          // Check if recipient has any team in common with current user
+          const hasCommonTeam = recipientTeams.some((team) => userTeams.includes(team));
+          console.log(`Checking checkout ${checkout.id}:`, {
+            recipient: checkout.recipient_username,
+            recipientTeams,
+            userTeams,
+            hasCommonTeam,
+          });
+          return hasCommonTeam;
+        });
+        console.log(`Filtered ${filtered.length} team checkouts from ${checkouts.length} total`);
+      } else {
+        // User has no teams, show empty
+        console.log("User has no teams, showing empty list");
+        filtered = [];
+      }
     }
 
     // Then filter by search query
@@ -122,7 +162,7 @@ export function CheckoutTable({ checkouts, currentUserId }: CheckoutTableProps) 
       const bDate = bReturned ? b.returned_date! : b.sign_out_date;
       return new Date(bDate).getTime() - new Date(aDate).getTime();
     });
-  }, [checkouts, viewMode, currentUserId, statusFilter, searchQuery]);
+  }, [checkouts, viewMode, currentUserId, statusFilter, searchQuery, userTeams]);
 
   // Separate active and returned checkouts
   const activeCheckouts = React.useMemo(
@@ -188,11 +228,23 @@ export function CheckoutTable({ checkouts, currentUserId }: CheckoutTableProps) 
           Your Checkouts
         </Button>
         <Button
+          variant={viewMode === "everyone" ? "default" : "outline"}
+          onClick={() => setViewMode("everyone")}
+          className="flex-1 sm:flex-initial"
+        >
+          Everyone Checkouts
+        </Button>
+        <Button
           variant={viewMode === "team" ? "default" : "outline"}
           onClick={() => setViewMode("team")}
           className="flex-1 sm:flex-initial"
         >
           Team Checkouts
+          {userTeams.length > 0 && (
+            <Badge variant="secondary" className="ml-2">
+              {userTeams.length}
+            </Badge>
+          )}
         </Button>
       </div>
 
@@ -279,10 +331,27 @@ export function CheckoutTable({ checkouts, currentUserId }: CheckoutTableProps) 
         </div>
       )}
 
+      {/* Team Info (for debugging) */}
+      {viewMode === "team" && (
+        <div className="text-xs text-muted-foreground p-2 bg-muted rounded-md">
+          {userTeams.length === 0 ? (
+            <span className="text-amber-600 dark:text-amber-400">
+              ⚠️ You have no teams assigned. Teams are fetched from GitHub during login.
+            </span>
+          ) : (
+            <span>
+              Your teams: <strong>{userTeams.join(", ")}</strong>
+            </span>
+          )}
+        </div>
+      )}
+
       {/* Results Count */}
       <div className="text-sm text-muted-foreground">
         {viewMode === "yours"
           ? `Showing ${filteredAndSortedCheckouts.length} of your checkout${filteredAndSortedCheckouts.length !== 1 ? "s" : ""}`
+          : viewMode === "everyone"
+          ? `Showing ${filteredAndSortedCheckouts.length} checkout${filteredAndSortedCheckouts.length !== 1 ? "s" : ""}`
           : `Showing ${filteredAndSortedCheckouts.length} team checkout${filteredAndSortedCheckouts.length !== 1 ? "s" : ""}`}
       </div>
 
@@ -291,7 +360,11 @@ export function CheckoutTable({ checkouts, currentUserId }: CheckoutTableProps) 
         <div className="text-center py-12 text-muted-foreground">
           {viewMode === "yours"
             ? "You have no checkouts matching the selected filters."
-            : "No team checkouts found matching the selected filters."}
+            : viewMode === "everyone"
+            ? "No checkouts found matching the selected filters."
+            : userTeams.length === 0
+            ? "You have no teams assigned. Teams are fetched from GitHub during login. Please check that GITHUB_ORG_NAME is set and you've logged in recently."
+            : "No team checkouts found. This means no other users in your teams have any checkouts."}
         </div>
       ) : (
         <div className="rounded-md border">
@@ -301,7 +374,7 @@ export function CheckoutTable({ checkouts, currentUserId }: CheckoutTableProps) 
                 <TableRow>
                   <TableHead className="w-[80px] py-2">Image</TableHead>
                   <TableHead className="py-2">Item Name</TableHead>
-                  {viewMode === "team" && <TableHead className="py-2">Recipient</TableHead>}
+                  {(viewMode === "everyone" || viewMode === "team") && <TableHead className="py-2">Recipient</TableHead>}
                   <TableHead className="py-2">Quantity</TableHead>
                   <TableHead className="py-2">Status</TableHead>
                   <TableHead className="py-2">Checkout Date</TableHead>
@@ -330,7 +403,7 @@ export function CheckoutTable({ checkouts, currentUserId }: CheckoutTableProps) 
                     )}
                   </TableCell>
                   <TableCell className="font-medium py-2">{checkout.item_name}</TableCell>
-                  {viewMode === "team" && (
+                  {(viewMode === "everyone" || viewMode === "team") && (
                     <TableCell className="py-2">
                       <div className="flex items-center gap-2">
                         <User className="h-3 w-3 text-muted-foreground" />
@@ -397,7 +470,7 @@ export function CheckoutTable({ checkouts, currentUserId }: CheckoutTableProps) 
               {/* Returned Checkouts Section */}
               {returnedCheckouts.length > 0 && activeCheckouts.length > 0 && (
                 <TableRow className="bg-muted/50">
-                  <TableCell colSpan={viewMode === "team" ? 8 : 7} className="font-semibold text-muted-foreground py-2">
+                  <TableCell colSpan={(viewMode === "everyone" || viewMode === "team") ? 8 : 7} className="font-semibold text-muted-foreground py-2">
                     Returned
                   </TableCell>
                 </TableRow>
@@ -420,7 +493,7 @@ export function CheckoutTable({ checkouts, currentUserId }: CheckoutTableProps) 
                     )}
                   </TableCell>
                   <TableCell className="font-medium py-2">{checkout.item_name}</TableCell>
-                  {viewMode === "team" && (
+                  {(viewMode === "everyone" || viewMode === "team") && (
                     <TableCell className="py-2">
                       <div className="flex items-center gap-2">
                         <User className="h-3 w-3 text-muted-foreground" />

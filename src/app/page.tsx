@@ -30,16 +30,39 @@ export default async function Dashboard() {
   // Fetch user profile from profiles table
   let username = null;
   let userProfileId = null;
+  let userTeams: string[] = [];
   if (session?.user?.id) {
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("id, username")
-      .eq("supabase_uid", session.user.id)
-      .is("deleted_at", null)
-      .single();
-    
-    username = profile?.username || null;
-    userProfileId = profile?.id || null;
+    try {
+      const { data: profile, error: profileError } = await supabase
+        .from("profiles")
+        .select("id, username, teams")
+        .eq("supabase_uid", session.user.id)
+        .is("deleted_at", null)
+        .single();
+      
+      if (profileError) {
+        console.error("Error fetching profile:", profileError);
+        // If teams column doesn't exist, try without it
+        if (profileError.message?.includes("column") && profileError.message?.includes("teams")) {
+          const { data: profileWithoutTeams } = await supabase
+            .from("profiles")
+            .select("id, username")
+            .eq("supabase_uid", session.user.id)
+            .is("deleted_at", null)
+            .single();
+          username = profileWithoutTeams?.username || null;
+          userProfileId = profileWithoutTeams?.id || null;
+          userTeams = [];
+          console.warn("⚠️ Teams column not found. Please run migration: migrations/add_teams_to_profiles.sql");
+        }
+      } else {
+        username = profile?.username || null;
+        userProfileId = profile?.id || null;
+        userTeams = (profile?.teams as string[]) || [];
+      }
+    } catch (error) {
+      console.error("Error in profile fetch:", error);
+    }
   }
 
   // Fetch items with their tags
@@ -82,22 +105,27 @@ export default async function Dashboard() {
   }
 
   // Fetch checkouts
-  type CheckoutItem = {
-    id: string;
-    item_id: string;
-    item_name: string;
-    image_URL: string | null;
-    quantity: number;
-    sign_out_date: string;
-    expected_return_date: string | null;
-    returned_date: string | null;
-    recipient_username: string;
-    recipient_id: string;
-  };
+type CheckoutItem = {
+  id: string;
+  item_id: string;
+  item_name: string;
+  image_URL: string | null;
+  quantity: number;
+  sign_out_date: string;
+  expected_return_date: string | null;
+  returned_date: string | null;
+  recipient_username: string;
+  recipient_id: string;
+  recipient_teams?: string[];
+};
 
   let checkouts: CheckoutItem[] = [];
   if (session) {
-    const { data: checkoutsData, error: checkoutsError } = await supabase
+    // Try to fetch with teams first
+    let checkoutsData: any[] | null = null;
+    let checkoutsError: any = null;
+    
+    const { data, error } = await supabase
       .from("itemsignouts")
       .select(`
         id,
@@ -112,11 +140,43 @@ export default async function Dashboard() {
           image_URL
         ),
         profiles(
-          username
+          username,
+          teams
         )
       `)
       .is("deleted_at", null)
       .order("sign_out_date", { ascending: false });
+
+    checkoutsData = data;
+    checkoutsError = error;
+
+    // If error is about teams column, try without it
+    if (checkoutsError && checkoutsError.message?.includes("column") && checkoutsError.message?.includes("teams")) {
+      console.warn("⚠️ Teams column not found in profiles. Fetching checkouts without teams. Please run migration: migrations/add_teams_to_profiles.sql");
+      const { data: dataWithoutTeams, error: errorWithoutTeams } = await supabase
+        .from("itemsignouts")
+        .select(`
+          id,
+          item_id,
+          quantity,
+          sign_out_date,
+          expected_return_date,
+          returned_date,
+          recipient_id,
+          items!inner(
+            item_name,
+            image_URL
+          ),
+          profiles(
+            username
+          )
+        `)
+        .is("deleted_at", null)
+        .order("sign_out_date", { ascending: false });
+      
+      checkoutsData = dataWithoutTeams;
+      checkoutsError = errorWithoutTeams;
+    }
 
     if (!checkoutsError && checkoutsData) {
       checkouts = checkoutsData.map((checkout: any) => ({
@@ -130,6 +190,7 @@ export default async function Dashboard() {
         returned_date: checkout.returned_date,
         recipient_username: checkout.profiles?.username || "Unknown",
         recipient_id: checkout.recipient_id,
+        recipient_teams: checkout.profiles?.teams || [],
       }));
     }
   }
@@ -143,7 +204,7 @@ export default async function Dashboard() {
         </h1>
       </div>
 
-      <CollapsibleCheckoutCard checkouts={checkouts} currentUserId={userProfileId} />
+      <CollapsibleCheckoutCard checkouts={checkouts} currentUserId={userProfileId} userTeams={userTeams} />
 
       <Card className="w-full">
         <CardHeader className="py-3 px-3 sm:px-6">

@@ -24,11 +24,13 @@ type CheckoutItem = {
 type CollapsibleCheckoutCardProps = {
   checkouts: CheckoutItem[];
   currentUserId: string | null;
+  userTeams?: string[];
 };
 
 export function CollapsibleCheckoutCard({
   checkouts,
   currentUserId,
+  userTeams = [],
 }: CollapsibleCheckoutCardProps) {
   const [isOpen, setIsOpen] = React.useState(true);
 
@@ -98,7 +100,7 @@ export function CollapsibleCheckoutCard({
               : "-translate-y-2 opacity-0"
           )}
         >
-          <CheckoutTable checkouts={checkouts} currentUserId={currentUserId} />
+          <CheckoutTable checkouts={checkouts} currentUserId={currentUserId} userTeams={userTeams} />
         </CardContent>
       </div>
     </Card>

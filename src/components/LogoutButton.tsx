@@ -3,12 +3,13 @@
 
 import * as React from 'react';
 import { LogOut } from 'lucide-react';
-import { supabase } from '@/lib/supabaseClient'; // Ensure this path is correct
+import { createClient } from '@/utils/supabase/client';
 import { Button } from '@/components/ui/button'; // Assuming shadcn Button
 
 export const LogoutButton: React.FC = () => {
   const handleLogout = async () => {
     try {
+      const supabase = createClient();
       // Calls the Supabase signOut method
       const { error } = await supabase.auth.signOut();
       

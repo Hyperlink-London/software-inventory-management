@@ -17,6 +17,7 @@ type CheckoutItem = {
   returned_date: string | null;
   recipient_username: string;
   recipient_id: string;
+  recipient_teams?: string[];
 };
 
 export default async function CheckoutsPage() {
@@ -25,23 +26,49 @@ export default async function CheckoutsPage() {
     data: { session },
   } = await supabase.auth.getSession();
 
-  // Fetch user profile ID
+  // Fetch user profile ID and teams
   let userProfileId = null;
+  let userTeams: string[] = [];
   if (session?.user?.id) {
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("id")
-      .eq("supabase_uid", session.user.id)
-      .is("deleted_at", null)
-      .single();
-    
-    userProfileId = profile?.id || null;
+    try {
+      const { data: profile, error: profileError } = await supabase
+        .from("profiles")
+        .select("id, teams")
+        .eq("supabase_uid", session.user.id)
+        .is("deleted_at", null)
+        .single();
+      
+      if (profileError) {
+        console.error("Error fetching profile:", profileError);
+        // If teams column doesn't exist, try without it
+        if (profileError.message?.includes("column") && profileError.message?.includes("teams")) {
+          const { data: profileWithoutTeams } = await supabase
+            .from("profiles")
+            .select("id")
+            .eq("supabase_uid", session.user.id)
+            .is("deleted_at", null)
+            .single();
+          userProfileId = profileWithoutTeams?.id || null;
+          userTeams = [];
+          console.warn("⚠️ Teams column not found. Please run migration: migrations/add_teams_to_profiles.sql");
+        }
+      } else {
+        userProfileId = profile?.id || null;
+        userTeams = (profile?.teams as string[]) || [];
+      }
+    } catch (error) {
+      console.error("Error in profile fetch:", error);
+    }
   }
 
   // Fetch checkouts
   let checkouts: CheckoutItem[] = [];
   if (session) {
-    const { data: checkoutsData, error: checkoutsError } = await supabase
+    // Try to fetch with teams first
+    let checkoutsData: any[] | null = null;
+    let checkoutsError: any = null;
+    
+    const { data, error } = await supabase
       .from("itemsignouts")
       .select(`
         id,
@@ -56,11 +83,43 @@ export default async function CheckoutsPage() {
           image_URL
         ),
         profiles(
-          username
+          username,
+          teams
         )
       `)
       .is("deleted_at", null)
       .order("sign_out_date", { ascending: false });
+
+    checkoutsData = data;
+    checkoutsError = error;
+
+    // If error is about teams column, try without it
+    if (checkoutsError && checkoutsError.message?.includes("column") && checkoutsError.message?.includes("teams")) {
+      console.warn("⚠️ Teams column not found in profiles. Fetching checkouts without teams. Please run migration: migrations/add_teams_to_profiles.sql");
+      const { data: dataWithoutTeams, error: errorWithoutTeams } = await supabase
+        .from("itemsignouts")
+        .select(`
+          id,
+          item_id,
+          quantity,
+          sign_out_date,
+          expected_return_date,
+          returned_date,
+          recipient_id,
+          items!inner(
+            item_name,
+            image_URL
+          ),
+          profiles(
+            username
+          )
+        `)
+        .is("deleted_at", null)
+        .order("sign_out_date", { ascending: false });
+      
+      checkoutsData = dataWithoutTeams;
+      checkoutsError = errorWithoutTeams;
+    }
 
     if (!checkoutsError && checkoutsData) {
       checkouts = checkoutsData.map((checkout: any) => ({
@@ -74,6 +133,7 @@ export default async function CheckoutsPage() {
         returned_date: checkout.returned_date,
         recipient_username: checkout.profiles?.username || "Unknown",
         recipient_id: checkout.recipient_id,
+        recipient_teams: checkout.profiles?.teams || [],
       }));
     }
   }
@@ -101,7 +161,7 @@ export default async function CheckoutsPage() {
           <CardTitle>All Checkouts</CardTitle>
         </CardHeader>
         <CardContent>
-          <CheckoutTable checkouts={checkouts} currentUserId={userProfileId} />
+          <CheckoutTable checkouts={checkouts} currentUserId={userProfileId} userTeams={userTeams} />
         </CardContent>
       </Card>
     </div>
