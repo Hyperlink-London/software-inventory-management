@@ -12,6 +12,7 @@ type ItemWithTags = {
   quantity: number;
   notes: string | null;
   image_URL: string | null;
+  created_by: string | null;
   tags: Array<{
     id: string;
     name: string;
@@ -29,19 +30,22 @@ export default async function ItemsPage() {
   if (user) {
     const { data: itemsData, error: itemsError } = await supabase
       .from("items")
-      .select(`
+      .select(
+        `
         id,
         item_name,
         quantity,
         notes,
         image_URL,
+        created_by,
         itemtags(
           tags(
             id,
             name
           )
         )
-      `)
+      `,
+      )
       .is("deleted_at", null)
       .order("item_name", { ascending: true });
 
@@ -53,6 +57,7 @@ export default async function ItemsPage() {
         quantity: item.quantity,
         notes: item.notes,
         image_URL: item.image_URL,
+        created_by: item.created_by,
         tags: (item.itemtags || [])
           .filter((it: any) => it.tags && !it.tags.deleted_at && !it.deleted_at)
           .map((it: any) => ({
@@ -98,5 +103,3 @@ export default async function ItemsPage() {
     </div>
   );
 }
-
-
