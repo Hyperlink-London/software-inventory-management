@@ -145,8 +145,28 @@ export function EditItemDialog({
     }));
   };
 
+  const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2MB
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files ? e.target.files[0] : null;
+
+    if (!file) return;
+
+    // Validate type
+    if (!file.type.startsWith("image/")) {
+      alert("Please select a valid image file.");
+      e.target.value = ""; // Clear invalid file
+      return;
+    }
+
+    // Validate size
+    if (file.size > MAX_FILE_SIZE) {
+      alert("Image must be under 2MB.");
+      e.target.value = ""; // Clear invalid file
+      return;
+    }
+
+    // Passed validation
     setFormData((prev) => ({
       ...prev,
       image: file,
