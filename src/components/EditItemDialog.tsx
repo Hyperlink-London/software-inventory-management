@@ -39,6 +39,7 @@ type ItemWithTags = {
   quantity: number;
   notes: string | null;
   image_URL: string | null;
+  created_by: string | null;
   tags: Array<{
     id: string;
     name: string;
@@ -301,6 +302,7 @@ export function EditItemDialog({
           quantity,
           notes,
           image_URL,
+          created_by,
           itemtags(
             tags(
               id,
@@ -320,6 +322,7 @@ export function EditItemDialog({
           quantity: itemWithTagsData.quantity,
           notes: itemWithTagsData.notes,
           image_URL: itemWithTagsData.image_URL,
+          created_by: itemWithTagsData.created_by,
           tags: (itemWithTagsData.itemtags || [])
             .filter(
               (it: any) => it.tags && !it.tags.deleted_at && !it.deleted_at,
