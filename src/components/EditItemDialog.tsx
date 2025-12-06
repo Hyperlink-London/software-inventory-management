@@ -18,6 +18,8 @@ import { TagSelector } from "@/components/TagSelector";
 import { TagOption } from "@/hooks/useTagSelector";
 import { Trash2, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
+import { createTag } from "@/actions/items/action";
+import { deleteItem } from "@/actions/items/action";
 
 /**
  * Fetches all tags from the Supabase 'tags' table.
@@ -171,6 +173,28 @@ export function EditItemDialog({ open, onOpenChange, item, onSuccess }: EditItem
       // Handle image upload if a new image was selected
       let image_URL = formData.existingImageUrl;
       if (formData.image) {
+        // Delete old image if it exists using RPC function
+        if (formData.existingImageUrl) {
+          try {
+            const { data: deleteResult, error: deleteError } = await supabase.rpc("delete_image_from_storage", {
+              p_image_url: formData.existingImageUrl
+            });
+            
+            if (deleteError) {
+              console.warn("RPC delete image failed:", deleteError);
+            } else if (deleteResult && !deleteResult[0]?.success) {
+              console.warn("Image deletion unsuccessful:", deleteResult[0]?.message);
+            } else {
+              console.log("Old image deleted successfully");
+            }
+            // Continue with upload regardless of delete result
+          } catch (error) {
+            console.warn("Error calling delete image RPC:", error);
+            // Continue with upload even if delete fails
+          }
+        }
+
+        // Upload new image
         const fileName = `${crypto.randomUUID()}-${formData.image.name}`;
 
         const { data: uploadData, error: uploadError } = await supabase.storage
@@ -191,24 +215,39 @@ export function EditItemDialog({ open, onOpenChange, item, onSuccess }: EditItem
         image_URL = urlData.publicUrl;
       }
 
-      // Update item
-      const { data: updatedItemData, error: itemError } = await supabase
-        .from("items")
-        .update({
-          item_name: formData.name,
-          quantity: formData.quantity,
-          notes: formData.notes,
-          image_URL: image_URL,
-        })
-        .eq("id", item.id)
-        .select()
-        .single();
+      // Update item using RPC function
+      const rpcParams = {
+        p_item_id: item.id,
+        p_item_name: formData.name,
+        p_quantity: formData.quantity,
+        p_notes: formData.notes || null,
+        p_image_url: image_URL || null,
+        p_verify_ownership: false, // Set to true if you want to restrict updates to creator only
+      };
+      
+      console.log("Calling update_item RPC with params:", rpcParams);
+      
+      const { data: updatedItemData, error: itemError } = await supabase.rpc("update_item", rpcParams);
 
       if (itemError) {
-        console.error("Update failed:", itemError);
-        toast.error("Failed to update item");
+        console.error("Update failed - Full error object:", itemError);
+        console.error("Error message:", itemError.message);
+        console.error("Error details:", itemError.details);
+        console.error("Error hint:", itemError.hint);
+        console.error("Error code:", itemError.code);
+        
+        // Empty error object usually means function doesn't exist or permission issue
+        if (Object.keys(itemError).length === 0) {
+          console.error("Empty error object - RPC function may not exist or user lacks permissions");
+          toast.error("Failed to update item: RPC function error. Please check if 'update_item' function exists in Supabase.");
+        } else {
+          const errorMessage = itemError.message || itemError.details || itemError.hint || "Unknown error occurred";
+          toast.error(`Failed to update item: ${errorMessage}`);
+        }
         return;
       }
+      
+      console.log("Update successful, data:", updatedItemData);
 
       // Delete existing item tags
       await supabase
@@ -227,15 +266,15 @@ export function EditItemDialog({ open, onOpenChange, item, onSuccess }: EditItem
           if (existingTag) {
             tagIdsToLink.push(existingTag.id);
           } else {
-            // Create new tag
-            const { data: newTagData, error: newTagError } = await supabase
-              .from("tags")
-              .insert([{ name: tagIdOrName }])
-              .select()
-              .single();
-            
-            if (newTagError) {
-              console.error("Failed to create new tag:", newTagError);
+            // Create new tag using server action (calls RPC function server-side)
+            try {
+              const newTag = await createTag({ name: tagIdOrName });
+              if (newTag && newTag.id) {
+                tagIdsToLink.push(newTag.id);
+              }
+            } catch (err) {
+              console.error("Failed to create new tag:", err);
+              // Try to find if tag was created by another process
               const { data: foundTag } = await supabase
                 .from("tags")
                 .select("id")
@@ -244,9 +283,9 @@ export function EditItemDialog({ open, onOpenChange, item, onSuccess }: EditItem
               
               if (foundTag) {
                 tagIdsToLink.push(foundTag.id);
+              } else {
+                console.error("Could not create or find tag:", tagIdOrName);
               }
-            } else {
-              tagIdsToLink.push(newTagData.id);
             }
           }
         }
@@ -330,30 +369,9 @@ export function EditItemDialog({ open, onOpenChange, item, onSuccess }: EditItem
 
     try {
       setIsDeleting(true);
-      const supabase = createClient();
-
-      // First, delete all related itemtags
-      const { error: itemTagsError } = await supabase
-        .from("itemtags")
-        .delete()
-        .eq("item_id", item.id);
-
-      if (itemTagsError) {
-        console.error("Failed to delete item tags:", itemTagsError);
-        // Continue with item deletion even if tags fail
-      }
-
-      // Hard delete the item from the database
-      const { error } = await supabase
-        .from("items")
-        .delete()
-        .eq("id", item.id);
-
-      if (error) {
-        console.error("Delete failed:", error);
-        toast.error("Failed to delete item");
-        return;
-      }
+      
+      // Use server action to delete item (handles image deletion and database deletion)
+      await deleteItem(item.id);
 
       toast.success("Item deleted successfully!");
       onOpenChange(false);
@@ -363,7 +381,7 @@ export function EditItemDialog({ open, onOpenChange, item, onSuccess }: EditItem
       }
     } catch (error) {
       console.error("Error deleting item:", error);
-      toast.error("An error occurred while deleting the item");
+      toast.error(`Failed to delete item: ${error instanceof Error ? error.message : "Unknown error"}`);
     } finally {
       setIsDeleting(false);
     }

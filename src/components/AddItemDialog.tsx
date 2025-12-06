@@ -14,10 +14,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { useUser, getProfileID } from "@/contexts/UserContext";
+import { useUser } from "@/contexts/UserContext";
 import { TagSelector } from "@/components/TagSelector";
 import { TagOption } from "@/hooks/useTagSelector";
 import { toast } from "sonner";
+import { createItem, createTag } from "@/actions/items/action";
 
 /**
  * Fetches all tags from the Supabase 'tags' table.
@@ -35,7 +36,6 @@ const fetchAllTags = async (): Promise<TagOption[]> => {
 };
 
 type ItemData = {
-  id: string;
   name: string;
   image?: File | null;
   notes: string;
@@ -53,7 +53,6 @@ export function AddItemDialog({ open, onOpenChange, onSuccess }: AddItemDialogPr
   const { user, loading } = useUser();
 
   const [formData, setFormData] = useState<ItemData>({
-    id: "",
     name: "",
     image: null,
     notes: "",
@@ -65,18 +64,7 @@ export function AddItemDialog({ open, onOpenChange, onSuccess }: AddItemDialogPr
   const [isLoadingTags, setIsLoadingTags] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Load profile ID when dialog opens
-  useEffect(() => {
-    if (open && !loading) {
-      (async () => {
-        const profileID = await getProfileID();
-        setFormData((prev) => ({
-          ...prev,
-          id: profileID,
-        }));
-      })();
-    }
-  }, [open, loading]);
+  // No longer need to load profile ID - RPC functions handle this automatically
 
   // Load tags when dialog opens
   useEffect(() => {
@@ -101,7 +89,6 @@ export function AddItemDialog({ open, onOpenChange, onSuccess }: AddItemDialogPr
   useEffect(() => {
     if (!open) {
       setFormData({
-        id: "",
         name: "",
         image: null,
         notes: "",
@@ -183,26 +170,19 @@ export function AddItemDialog({ open, onOpenChange, onSuccess }: AddItemDialogPr
       }
 
       // ============================
-      // Insert into items table
+      // Create item using server action (calls RPC function server-side)
       // ============================
-      const { data: itemData, error: itemError } = await supabase
-        .from("items")
-        .insert([
-          {
-            created_by: formData.id,
-            item_name: formData.name,
-            quantity: formData.quantity,
-            notes: formData.notes,
-            image_URL: image_URL,
-          },
-        ])
-        .select()
-        .single();
-
-      // error should be null if insert was successful
-      if (itemError) {
-        console.error("Insert failed:", itemError);
-        toast.error("Failed to add item");
+      let item;
+      try {
+        item = await createItem({
+          name: formData.name,
+          quantity: formData.quantity,
+          notes: formData.notes || null,
+          image_url: image_URL || null,
+        });
+      } catch (err) {
+        console.error("Failed to create item:", err);
+        toast.error(`Failed to add item: ${err instanceof Error ? err.message : String(err)}`);
         return;
       }
 
@@ -220,15 +200,14 @@ export function AddItemDialog({ open, onOpenChange, onSuccess }: AddItemDialogPr
             // It's an existing tag ID, use it directly
             tagIdsToLink.push(existingTag.id);
           } else {
-            // It's a new tag name, create it first
-            const { data: newTagData, error: newTagError } = await supabase
-              .from("tags")
-              .insert([{ name: tagIdOrName }])
-              .select()
-              .single();
-            
-            if (newTagError) {
-              console.error("Failed to create new tag:", newTagError);
+            // It's a new tag name, create it using server action (calls RPC function server-side)
+            try {
+              const newTag = await createTag({ name: tagIdOrName });
+              if (newTag && newTag.id) {
+                tagIdsToLink.push(newTag.id);
+              }
+            } catch (err) {
+              console.error("Failed to create new tag:", err);
               // Try to find if tag was created by another process
               const { data: foundTag } = await supabase
                 .from("tags")
@@ -241,8 +220,6 @@ export function AddItemDialog({ open, onOpenChange, onSuccess }: AddItemDialogPr
               } else {
                 console.error("Could not create or find tag:", tagIdOrName);
               }
-            } else {
-              tagIdsToLink.push(newTagData.id);
             }
           }
         }
@@ -253,7 +230,7 @@ export function AddItemDialog({ open, onOpenChange, onSuccess }: AddItemDialogPr
             .from("itemtags")
             .insert(
               tagIdsToLink.map((tagId) => ({
-                item_id: itemData.id,
+                item_id: item.id,
                 tag_id: tagId,
               })),
             );
@@ -273,7 +250,6 @@ export function AddItemDialog({ open, onOpenChange, onSuccess }: AddItemDialogPr
       toast.success("Item added successfully!");
 
       setFormData({
-        id: "",
         name: "",
         image: null,
         notes: "",
