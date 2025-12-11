@@ -5,7 +5,7 @@ import { cookies } from "next/headers";
 export default async function DebugPage() {
   // Log cookies for debugging
   const cookieStore = await cookies();
-  const supabase = await createClient(cookieStore);
+  const supabase = await createClient(cookies());
   const allCookies = cookieStore.getAll();
   console.log("Debug page - Cookies:", {
     count: allCookies.length,
@@ -276,9 +276,6 @@ export default async function DebugPage() {
                     name: c.name, 
                     hasValue: !!c.value, 
                     valueLength: c.value?.length,
-                    httpOnly: c.httpOnly,
-                    secure: c.secure,
-                    sameSite: c.sameSite,
                   })),
                 null,
                 2
