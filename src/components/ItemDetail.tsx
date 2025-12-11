@@ -2,7 +2,14 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, CheckCircle, AlertCircle, XCircle, ShoppingCart, Pencil } from "lucide-react";
+import {
+  ArrowLeft,
+  CheckCircle,
+  AlertCircle,
+  XCircle,
+  ShoppingCart,
+  Pencil,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { CheckoutDialog } from "@/components/CheckoutDialog";
@@ -10,12 +17,15 @@ import { EditItemDialog } from "@/components/EditItemDialog";
 import { checkoutItem } from "@/actions/checkout/action";
 import { CollapsibleCheckoutCard } from "@/components/CollapsibleCheckoutCard";
 
+import { isAdmin, getProfileID } from "@/contexts/UserContext";
+
 type ItemWithTags = {
   id: string;
   item_name: string;
   quantity: number;
   notes: string | null;
   image_URL: string | null;
+  created_by: string | null;
   tags: Array<{
     id: string;
     name: string;
@@ -42,11 +52,35 @@ type ItemDetailProps = {
   userTeams?: string[];
 };
 
-export function ItemDetail({ item, checkouts, currentUserId, userTeams = [] }: ItemDetailProps) {
+export function ItemDetail({
+  item,
+  checkouts,
+  currentUserId,
+  userTeams = [],
+}: ItemDetailProps) {
   const router = useRouter();
   const [currentItem, setCurrentItem] = React.useState<ItemWithTags>(item);
   const [checkoutDialogOpen, setCheckoutDialogOpen] = React.useState(false);
   const [editDialogOpen, setEditDialogOpen] = React.useState(false);
+
+  // get Permissions
+  const [isUserAdmin, setIsUserAdmin] = React.useState(false);
+  const [profileID, setProfileID] = React.useState<String>("");
+
+  React.useEffect(() => {
+    async function checkPermissions() {
+      try {
+        const resultA = await isAdmin();
+        setIsUserAdmin(!!resultA); // guarantees boolean
+      } catch (e) {
+        console.error("Failed to check admin:", e);
+        setIsUserAdmin(false);
+      }
+      const resultID = await getProfileID();
+      setProfileID(resultID);
+    }
+    checkPermissions();
+  }, []);
 
   const getStatusIcon = (quantity: number) => {
     if (quantity === 0) {
@@ -70,7 +104,10 @@ export function ItemDetail({ item, checkouts, currentUserId, userTeams = [] }: I
     }
   };
 
-  const handleItemUpdate = (updatedItem?: ItemWithTags, deletedItemId?: string) => {
+  const handleItemUpdate = (
+    updatedItem?: ItemWithTags,
+    deletedItemId?: string,
+  ) => {
     if (deletedItemId && deletedItemId === currentItem.id) {
       // If this item was deleted, navigate back to the list
       router.push("/items");
@@ -110,7 +147,9 @@ export function ItemDetail({ item, checkouts, currentUserId, userTeams = [] }: I
           </Button>
           <div className="space-y-1">
             <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="text-3xl font-bold tracking-tight">{currentItem.item_name}</h1>
+              <h1 className="text-3xl font-bold tracking-tight">
+                {currentItem.item_name}
+              </h1>
               {getStatusIcon(currentItem.quantity)}
             </div>
             <p className="text-muted-foreground">
@@ -120,14 +159,16 @@ export function ItemDetail({ item, checkouts, currentUserId, userTeams = [] }: I
         </div>
 
         <div className="flex gap-2 flex-wrap">
-          <Button
-            variant="outline"
-            onClick={() => setEditDialogOpen(true)}
-            className="h-9"
-          >
-            <Pencil className="mr-2 h-4 w-4" />
-            Edit
-          </Button>
+          {(isUserAdmin || profileID == item.created_by) && (
+            <Button
+              variant="outline"
+              onClick={() => setEditDialogOpen(true)}
+              className="h-9"
+            >
+              <Pencil className="mr-2 h-4 w-4" />
+              Edit
+            </Button>
+          )}
           <Button
             variant="outline"
             onClick={() => setCheckoutDialogOpen(true)}
@@ -162,27 +203,31 @@ export function ItemDetail({ item, checkouts, currentUserId, userTeams = [] }: I
           {/* Status and quantity */}
           <div className="rounded-lg border p-4 space-y-3">
             <div className="flex items-center justify-between">
-              <span className="text-sm font-medium text-muted-foreground">Status</span>
+              <span className="text-sm font-medium text-muted-foreground">
+                Status
+              </span>
               <div className="flex items-center gap-2">
                 {getStatusIcon(currentItem.quantity)}
                 <span className="text-sm">
                   {currentItem.quantity === 0
                     ? "Out of stock"
                     : currentItem.quantity < 5
-                    ? "Low stock"
-                    : "In stock"}
+                      ? "Low stock"
+                      : "In stock"}
                 </span>
               </div>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-sm font-medium text-muted-foreground">Quantity</span>
+              <span className="text-sm font-medium text-muted-foreground">
+                Quantity
+              </span>
               <span
                 className={
                   currentItem.quantity === 0
                     ? "text-destructive font-semibold"
                     : currentItem.quantity < 5
-                    ? "text-yellow-500 font-semibold"
-                    : "font-semibold"
+                      ? "text-yellow-500 font-semibold"
+                      : "font-semibold"
                 }
               >
                 {currentItem.quantity}
@@ -193,7 +238,9 @@ export function ItemDetail({ item, checkouts, currentUserId, userTeams = [] }: I
           {/* Tags */}
           <div className="rounded-lg border p-4 space-y-3">
             <div className="flex items-center justify-between">
-              <span className="text-sm font-medium text-muted-foreground">Tags</span>
+              <span className="text-sm font-medium text-muted-foreground">
+                Tags
+              </span>
               <span className="text-xs text-muted-foreground">
                 {currentItem.tags.length}{" "}
                 {currentItem.tags.length === 1 ? "tag" : "tags"}
@@ -232,7 +279,9 @@ export function ItemDetail({ item, checkouts, currentUserId, userTeams = [] }: I
 
       {/* Checkouts for this item */}
       <div className="space-y-3">
-        <h2 className="text-xl font-semibold tracking-tight">Checkouts for this item</h2>
+        <h2 className="text-xl font-semibold tracking-tight">
+          Checkouts for this item
+        </h2>
         <p className="text-sm text-muted-foreground">
           View all checkouts made for this item, including active and returned.
         </p>
@@ -259,5 +308,3 @@ export function ItemDetail({ item, checkouts, currentUserId, userTeams = [] }: I
     </div>
   );
 }
-
-

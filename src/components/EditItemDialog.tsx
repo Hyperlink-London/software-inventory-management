@@ -18,6 +18,8 @@ import { TagSelector } from "@/components/TagSelector";
 import { TagOption } from "@/hooks/useTagSelector";
 import { Trash2, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
+import { createTag } from "@/actions/items/action";
+import { deleteItem } from "@/actions/items/action";
 
 /**
  * Fetches all tags from the Supabase 'tags' table.
@@ -39,6 +41,7 @@ type ItemWithTags = {
   quantity: number;
   notes: string | null;
   image_URL: string | null;
+  created_by: string | null;
   tags: Array<{
     id: string;
     name: string;
@@ -61,7 +64,12 @@ type EditItemDialogProps = {
   onSuccess?: (updatedItem?: ItemWithTags, deletedItemId?: string) => void;
 };
 
-export function EditItemDialog({ open, onOpenChange, item, onSuccess }: EditItemDialogProps) {
+export function EditItemDialog({
+  open,
+  onOpenChange,
+  item,
+  onSuccess,
+}: EditItemDialogProps) {
   const [formData, setFormData] = useState<ItemData>({
     name: "",
     image: null,
@@ -139,8 +147,28 @@ export function EditItemDialog({ open, onOpenChange, item, onSuccess }: EditItem
     }));
   };
 
+  const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2MB
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files ? e.target.files[0] : null;
+
+    if (!file) return;
+
+    // Validate type
+    if (!file.type.startsWith("image/")) {
+      alert("Please select a valid image file.");
+      e.target.value = ""; // Clear invalid file
+      return;
+    }
+
+    // Validate size
+    if (file.size > MAX_FILE_SIZE) {
+      alert("Image must be under 2MB.");
+      e.target.value = ""; // Clear invalid file
+      return;
+    }
+
+    // Passed validation
     setFormData((prev) => ({
       ...prev,
       image: file,
@@ -171,6 +199,28 @@ export function EditItemDialog({ open, onOpenChange, item, onSuccess }: EditItem
       // Handle image upload if a new image was selected
       let image_URL = formData.existingImageUrl;
       if (formData.image) {
+        // Delete old image if it exists using RPC function
+        if (formData.existingImageUrl) {
+          try {
+            const { data: deleteResult, error: deleteError } = await supabase.rpc("delete_image_from_storage", {
+              p_image_url: formData.existingImageUrl
+            });
+            
+            if (deleteError) {
+              console.warn("RPC delete image failed:", deleteError);
+            } else if (deleteResult && !deleteResult[0]?.success) {
+              console.warn("Image deletion unsuccessful:", deleteResult[0]?.message);
+            } else {
+              console.log("Old image deleted successfully");
+            }
+            // Continue with upload regardless of delete result
+          } catch (error) {
+            console.warn("Error calling delete image RPC:", error);
+            // Continue with upload even if delete fails
+          }
+        }
+
+        // Upload new image
         const fileName = `${crypto.randomUUID()}-${formData.image.name}`;
 
         const { data: uploadData, error: uploadError } = await supabase.storage
@@ -191,62 +241,74 @@ export function EditItemDialog({ open, onOpenChange, item, onSuccess }: EditItem
         image_URL = urlData.publicUrl;
       }
 
-      // Update item
-      const { data: updatedItemData, error: itemError } = await supabase
-        .from("items")
-        .update({
-          item_name: formData.name,
-          quantity: formData.quantity,
-          notes: formData.notes,
-          image_URL: image_URL,
-        })
-        .eq("id", item.id)
-        .select()
-        .single();
+      // Update item using RPC function
+      const rpcParams = {
+        p_item_id: item.id,
+        p_item_name: formData.name,
+        p_quantity: formData.quantity,
+        p_notes: formData.notes || null,
+        p_image_url: image_URL || null,
+        p_verify_ownership: false, // Set to true if you want to restrict updates to creator only
+      };
+      
+      console.log("Calling update_item RPC with params:", rpcParams);
+      
+      const { data: updatedItemData, error: itemError } = await supabase.rpc("update_item", rpcParams);
 
       if (itemError) {
-        console.error("Update failed:", itemError);
-        toast.error("Failed to update item");
+        console.error("Update failed - Full error object:", itemError);
+        console.error("Error message:", itemError.message);
+        console.error("Error details:", itemError.details);
+        console.error("Error hint:", itemError.hint);
+        console.error("Error code:", itemError.code);
+        
+        // Empty error object usually means function doesn't exist or permission issue
+        if (Object.keys(itemError).length === 0) {
+          console.error("Empty error object - RPC function may not exist or user lacks permissions");
+          toast.error("Failed to update item: RPC function error. Please check if 'update_item' function exists in Supabase.");
+        } else {
+          const errorMessage = itemError.message || itemError.details || itemError.hint || "Unknown error occurred";
+          toast.error(`Failed to update item: ${errorMessage}`);
+        }
         return;
       }
+      
+      console.log("Update successful, data:", updatedItemData);
 
       // Delete existing item tags
-      await supabase
-        .from("itemtags")
-        .delete()
-        .eq("item_id", item.id);
+      await supabase.from("itemtags").delete().eq("item_id", item.id);
 
       // Insert new item tags if any were selected
       if (formData.tags.length > 0) {
         // Ensure all tags exist in the tags table
         const tagIdsToLink: string[] = [];
-        
+
         for (const tagIdOrName of formData.tags) {
-          const existingTag = availableTags.find(t => t.id === tagIdOrName);
-          
+          const existingTag = availableTags.find((t) => t.id === tagIdOrName);
+
           if (existingTag) {
             tagIdsToLink.push(existingTag.id);
           } else {
-            // Create new tag
-            const { data: newTagData, error: newTagError } = await supabase
-              .from("tags")
-              .insert([{ name: tagIdOrName }])
-              .select()
-              .single();
-            
-            if (newTagError) {
-              console.error("Failed to create new tag:", newTagError);
+            // Create new tag using server action (calls RPC function server-side)
+            try {
+              const newTag = await createTag({ name: tagIdOrName });
+              if (newTag && newTag.id) {
+                tagIdsToLink.push(newTag.id);
+              }
+            } catch (err) {
+              console.error("Failed to create new tag:", err);
+              // Try to find if tag was created by another process
               const { data: foundTag } = await supabase
                 .from("tags")
                 .select("id")
                 .eq("name", tagIdOrName)
                 .single();
-              
+
               if (foundTag) {
                 tagIdsToLink.push(foundTag.id);
+              } else {
+                console.error("Could not create or find tag:", tagIdOrName);
               }
-            } else {
-              tagIdsToLink.push(newTagData.id);
             }
           }
         }
@@ -272,19 +334,22 @@ export function EditItemDialog({ open, onOpenChange, item, onSuccess }: EditItem
       // Fetch updated item with tags for optimistic update
       const { data: itemWithTagsData } = await supabase
         .from("items")
-        .select(`
+        .select(
+          `
           id,
           item_name,
           quantity,
           notes,
           image_URL,
+          created_by,
           itemtags(
             tags(
               id,
               name
             )
           )
-        `)
+        `,
+        )
         .eq("id", item.id)
         .single();
 
@@ -296,8 +361,11 @@ export function EditItemDialog({ open, onOpenChange, item, onSuccess }: EditItem
           quantity: itemWithTagsData.quantity,
           notes: itemWithTagsData.notes,
           image_URL: itemWithTagsData.image_URL,
+          created_by: itemWithTagsData.created_by,
           tags: (itemWithTagsData.itemtags || [])
-            .filter((it: any) => it.tags && !it.tags.deleted_at && !it.deleted_at)
+            .filter(
+              (it: any) => it.tags && !it.tags.deleted_at && !it.deleted_at,
+            )
             .map((it: any) => ({
               id: it.tags.id,
               name: it.tags.name,
@@ -307,7 +375,7 @@ export function EditItemDialog({ open, onOpenChange, item, onSuccess }: EditItem
 
       toast.success("Item updated successfully!");
       onOpenChange(false);
-      
+
       if (onSuccess) {
         onSuccess(updatedItem);
       }
@@ -330,40 +398,19 @@ export function EditItemDialog({ open, onOpenChange, item, onSuccess }: EditItem
 
     try {
       setIsDeleting(true);
-      const supabase = createClient();
-
-      // First, delete all related itemtags
-      const { error: itemTagsError } = await supabase
-        .from("itemtags")
-        .delete()
-        .eq("item_id", item.id);
-
-      if (itemTagsError) {
-        console.error("Failed to delete item tags:", itemTagsError);
-        // Continue with item deletion even if tags fail
-      }
-
-      // Hard delete the item from the database
-      const { error } = await supabase
-        .from("items")
-        .delete()
-        .eq("id", item.id);
-
-      if (error) {
-        console.error("Delete failed:", error);
-        toast.error("Failed to delete item");
-        return;
-      }
+      
+      // Use server action to delete item (handles image deletion and database deletion)
+      await deleteItem(item.id);
 
       toast.success("Item deleted successfully!");
       onOpenChange(false);
-      
+
       if (onSuccess) {
         onSuccess(undefined, item.id);
       }
     } catch (error) {
       console.error("Error deleting item:", error);
-      toast.error("An error occurred while deleting the item");
+      toast.error(`Failed to delete item: ${error instanceof Error ? error.message : "Unknown error"}`);
     } finally {
       setIsDeleting(false);
     }
@@ -404,7 +451,9 @@ export function EditItemDialog({ open, onOpenChange, item, onSuccess }: EditItem
                   alt={formData.name}
                   className="h-32 w-32 object-cover rounded-md border"
                 />
-                <p className="text-xs text-muted-foreground mt-1">Current image</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Current image
+                </p>
               </div>
             )}
             <Input
@@ -415,7 +464,8 @@ export function EditItemDialog({ open, onOpenChange, item, onSuccess }: EditItem
               accept="image/*"
             />
             <p className="text-xs text-muted-foreground">
-              Leave empty to keep current image, or select a new image to replace it.
+              Leave empty to keep current image, or select a new image to
+              replace it.
             </p>
           </div>
 
@@ -472,7 +522,11 @@ export function EditItemDialog({ open, onOpenChange, item, onSuccess }: EditItem
               >
                 Cancel
               </Button>
-              <Button type="submit" disabled={isSubmitting || isDeleting} className="flex-1 sm:flex-initial h-11 sm:h-10">
+              <Button
+                type="submit"
+                disabled={isSubmitting || isDeleting}
+                className="flex-1 sm:flex-initial h-11 sm:h-10"
+              >
                 {isSubmitting ? "Saving..." : "Save Changes"}
               </Button>
             </div>
@@ -498,8 +552,12 @@ export function EditItemDialog({ open, onOpenChange, item, onSuccess }: EditItem
           </DialogHeader>
           <div className="py-4">
             <p className="text-sm text-muted-foreground">
-              Are you sure you want to delete <span className="font-semibold text-foreground">"{item?.item_name}"</span>? 
-              This will permanently remove the item and all associated data from the system.
+              Are you sure you want to delete{" "}
+              <span className="font-semibold text-foreground">
+                "{item?.item_name}"
+              </span>
+              ? This will permanently remove the item and all associated data
+              from the system.
             </p>
           </div>
           <DialogFooter className="flex-col sm:flex-row gap-2">
@@ -537,4 +595,3 @@ export function EditItemDialog({ open, onOpenChange, item, onSuccess }: EditItem
     </Dialog>
   );
 }
-

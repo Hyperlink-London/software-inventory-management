@@ -3,7 +3,16 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Search, Filter, X, CheckCircle, AlertCircle, XCircle, ShoppingCart, Pencil } from "lucide-react";
+import {
+  Search,
+  Filter,
+  X,
+  CheckCircle,
+  AlertCircle,
+  XCircle,
+  ShoppingCart,
+  Pencil,
+} from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -38,12 +47,15 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 
+import { isAdmin, getProfileID } from "@/contexts/UserContext";
+
 type ItemWithTags = {
   id: string;
   item_name: string;
   quantity: number;
   notes: string | null;
   image_URL: string | null;
+  created_by: string | null;
   tags: Array<{
     id: string;
     name: string;
@@ -57,7 +69,12 @@ type InventoryTableProps = {
   onItemUpdate?: () => void;
 };
 
-export function InventoryTable({ items, stickyControls = false, maxHeight = "none", onItemUpdate }: InventoryTableProps) {
+export function InventoryTable({
+  items,
+  stickyControls = false,
+  maxHeight = "none",
+  onItemUpdate,
+}: InventoryTableProps) {
   const router = useRouter();
   const [localItems, setLocalItems] = React.useState<ItemWithTags[]>(items);
   const [searchQuery, setSearchQuery] = React.useState("");
@@ -65,10 +82,32 @@ export function InventoryTable({ items, stickyControls = false, maxHeight = "non
   const [filterOpen, setFilterOpen] = React.useState(false);
   const [checkoutDialogOpen, setCheckoutDialogOpen] = React.useState(false);
   const [editDialogOpen, setEditDialogOpen] = React.useState(false);
-  const [selectedItem, setSelectedItem] = React.useState<ItemWithTags | null>(null);
+  const [selectedItem, setSelectedItem] = React.useState<ItemWithTags | null>(
+    null,
+  );
   const [mounted, setMounted] = React.useState(false);
   const [imageDialogOpen, setImageDialogOpen] = React.useState(false);
-  const [selectedImageItem, setSelectedImageItem] = React.useState<ItemWithTags | null>(null);
+  const [selectedImageItem, setSelectedImageItem] =
+    React.useState<ItemWithTags | null>(null);
+
+  // get Permissions
+  const [isUserAdmin, setIsUserAdmin] = React.useState(false);
+  const [profileID, setProfileID] = React.useState<String>("");
+
+  React.useEffect(() => {
+    async function checkPermissions() {
+      try {
+        const resultA = await isAdmin();
+        setIsUserAdmin(!!resultA); // guarantees boolean
+      } catch (e) {
+        console.error("Failed to check admin:", e);
+        setIsUserAdmin(false);
+      }
+      const resultID = await getProfileID();
+      setProfileID(resultID);
+    }
+    checkPermissions();
+  }, []);
 
   // Sync local items with props when they change
   React.useEffect(() => {
@@ -98,7 +137,7 @@ export function InventoryTable({ items, stickyControls = false, maxHeight = "non
         item.item_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         item.notes?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         item.tags.some((tag) =>
-          tag.name.toLowerCase().includes(searchQuery.toLowerCase())
+          tag.name.toLowerCase().includes(searchQuery.toLowerCase()),
         );
 
       // Tag filter
@@ -114,7 +153,7 @@ export function InventoryTable({ items, stickyControls = false, maxHeight = "non
     setSelectedTags((prev) =>
       prev.includes(tagName)
         ? prev.filter((t) => t !== tagName)
-        : [...prev, tagName]
+        : [...prev, tagName],
     );
   };
 
@@ -165,24 +204,29 @@ export function InventoryTable({ items, stickyControls = false, maxHeight = "non
     setImageDialogOpen(true);
   };
 
-  const handleItemUpdate = React.useCallback((updatedItem?: ItemWithTags, deletedItemId?: string) => {
-    if (deletedItemId) {
-      // Optimistically remove the deleted item
-      setLocalItems((prev) => prev.filter((item) => item.id !== deletedItemId));
-    } else if (updatedItem) {
-      // Optimistically update the item
-      setLocalItems((prev) =>
-        prev.map((item) => (item.id === updatedItem.id ? updatedItem : item))
-      );
-    }
-    
-    // Refresh server data in the background without blocking UI
-    router.refresh();
-    
-    if (onItemUpdate) {
-      onItemUpdate();
-    }
-  }, [router, onItemUpdate]);
+  const handleItemUpdate = React.useCallback(
+    (updatedItem?: ItemWithTags, deletedItemId?: string) => {
+      if (deletedItemId) {
+        // Optimistically remove the deleted item
+        setLocalItems((prev) =>
+          prev.filter((item) => item.id !== deletedItemId),
+        );
+      } else if (updatedItem) {
+        // Optimistically update the item
+        setLocalItems((prev) =>
+          prev.map((item) => (item.id === updatedItem.id ? updatedItem : item)),
+        );
+      }
+
+      // Refresh server data in the background without blocking UI
+      router.refresh();
+
+      if (onItemUpdate) {
+        onItemUpdate();
+      }
+    },
+    [router, onItemUpdate],
+  );
 
   const handleCheckout = async (data: {
     item_id: string;
@@ -210,7 +254,10 @@ export function InventoryTable({ items, stickyControls = false, maxHeight = "non
         {mounted ? (
           <Popover open={filterOpen} onOpenChange={setFilterOpen}>
             <PopoverTrigger asChild>
-              <Button variant="outline" className="w-full sm:w-auto h-10 sm:h-9 text-base sm:text-sm">
+              <Button
+                variant="outline"
+                className="w-full sm:w-auto h-10 sm:h-9 text-base sm:text-sm"
+              >
                 <Filter className="mr-2 h-4 w-4" />
                 Filter by Tags
                 {selectedTags.length > 0 && (
@@ -220,7 +267,10 @@ export function InventoryTable({ items, stickyControls = false, maxHeight = "non
                 )}
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-[calc(100vw-2rem)] sm:w-[200px] p-0" align="start">
+            <PopoverContent
+              className="w-[calc(100vw-2rem)] sm:w-[200px] p-0"
+              align="start"
+            >
               <Command>
                 <CommandInput placeholder="Search tags..." />
                 <CommandList>
@@ -244,7 +294,11 @@ export function InventoryTable({ items, stickyControls = false, maxHeight = "non
             </PopoverContent>
           </Popover>
         ) : (
-          <Button variant="outline" className="w-full sm:w-auto h-10 sm:h-9 text-base sm:text-sm" disabled>
+          <Button
+            variant="outline"
+            className="w-full sm:w-auto h-10 sm:h-9 text-base sm:text-sm"
+            disabled
+          >
             <Filter className="mr-2 h-4 w-4" />
             Filter by Tags
             {selectedTags.length > 0 && (
@@ -255,7 +309,11 @@ export function InventoryTable({ items, stickyControls = false, maxHeight = "non
           </Button>
         )}
         {(selectedTags.length > 0 || searchQuery) && (
-          <Button variant="ghost" onClick={clearFilters} className="w-full sm:w-auto h-10 sm:h-9 text-base sm:text-sm">
+          <Button
+            variant="ghost"
+            onClick={clearFilters}
+            className="w-full sm:w-auto h-10 sm:h-9 text-base sm:text-sm"
+          >
             <X className="mr-2 h-4 w-4" />
             Clear
           </Button>
@@ -329,7 +387,9 @@ export function InventoryTable({ items, stickyControls = false, maxHeight = "non
                 <span className="font-semibold text-base truncate hover:underline">
                   {item.item_name}
                 </span>
-                <div className="flex-shrink-0">{getStatusIcon(item.quantity)}</div>
+                <div className="flex-shrink-0">
+                  {getStatusIcon(item.quantity)}
+                </div>
               </div>
               <div className="mt-1 flex items-center gap-2">
                 <span className="text-sm text-muted-foreground">Quantity:</span>
@@ -338,8 +398,8 @@ export function InventoryTable({ items, stickyControls = false, maxHeight = "non
                     item.quantity === 0
                       ? "text-destructive font-semibold"
                       : item.quantity < 5
-                      ? "text-yellow-500 font-semibold"
-                      : "font-semibold"
+                        ? "text-yellow-500 font-semibold"
+                        : "font-semibold"
                   }
                 >
                   {item.quantity}
@@ -347,7 +407,7 @@ export function InventoryTable({ items, stickyControls = false, maxHeight = "non
               </div>
             </div>
           </div>
-          
+
           {item.tags.length > 0 && (
             <div className="flex flex-wrap gap-2">
               {item.tags.map((tag) => (
@@ -357,26 +417,30 @@ export function InventoryTable({ items, stickyControls = false, maxHeight = "non
               ))}
             </div>
           )}
-          
+
           {item.notes && (
             <div>
               <p className="text-xs text-muted-foreground mb-1">Notes:</p>
-              <p className="text-sm text-muted-foreground line-clamp-2">{item.notes}</p>
+              <p className="text-sm text-muted-foreground line-clamp-2">
+                {item.notes}
+              </p>
             </div>
           )}
-          
+
           <div className="flex gap-2 pt-2">
-            <Button
-              variant="outline"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleEditClick(item);
-              }}
-              className="flex-1 h-11 text-sm"
-            >
-              <Pencil className="mr-2 h-4 w-4" />
-              Edit
-            </Button>
+            {(isUserAdmin || profileID == item.created_by) && (
+              <Button
+                variant="outline"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleEditClick(item);
+                }}
+                className="flex-1 h-11 text-sm"
+              >
+                <Pencil className="mr-2 h-4 w-4" />
+                Edit
+              </Button>
+            )}
             <Button
               variant="outline"
               onClick={(e) => {
@@ -405,7 +469,7 @@ export function InventoryTable({ items, stickyControls = false, maxHeight = "non
         <>
           {/* Mobile Card View */}
           {mobileCardView}
-          
+
           {/* Desktop Table View */}
           <div className="hidden sm:block rounded-md border overflow-x-auto">
             <Table>
@@ -462,9 +526,7 @@ export function InventoryTable({ items, stickyControls = false, maxHeight = "non
                       </div>
                     </TableCell>
                     <TableCell className="font-medium">
-                      <span className="hover:underline">
-                        {item.item_name}
-                      </span>
+                      <span className="hover:underline">{item.item_name}</span>
                     </TableCell>
                     <TableCell>
                       <span
@@ -472,8 +534,8 @@ export function InventoryTable({ items, stickyControls = false, maxHeight = "non
                           item.quantity === 0
                             ? "text-destructive font-medium"
                             : item.quantity < 5
-                            ? "text-yellow-500 font-medium"
-                            : ""
+                              ? "text-yellow-500 font-medium"
+                              : ""
                         }
                       >
                         {item.quantity}
@@ -488,27 +550,33 @@ export function InventoryTable({ items, stickyControls = false, maxHeight = "non
                             </Badge>
                           ))
                         ) : (
-                          <span className="text-muted-foreground text-sm">No tags</span>
+                          <span className="text-muted-foreground text-sm">
+                            No tags
+                          </span>
                         )}
                       </div>
                     </TableCell>
                     <TableCell className="hidden md:table-cell text-muted-foreground">
-                      {item.notes || <span className="text-muted-foreground">—</span>}
+                      {item.notes || (
+                        <span className="text-muted-foreground">—</span>
+                      )}
                     </TableCell>
                     <TableCell>
                       <div className="flex gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleEditClick(item);
-                          }}
-                          className="flex-1"
-                        >
-                          <Pencil className="mr-2 h-4 w-4" />
-                          Edit
-                        </Button>
+                        {(isUserAdmin || profileID == item.created_by) && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleEditClick(item);
+                            }}
+                            className="flex-1"
+                          >
+                            <Pencil className="mr-2 h-4 w-4" />
+                            Edit
+                          </Button>
+                        )}
                         <Button
                           variant="outline"
                           size="sm"
@@ -620,4 +688,3 @@ export function InventoryTable({ items, stickyControls = false, maxHeight = "non
     </div>
   );
 }
-

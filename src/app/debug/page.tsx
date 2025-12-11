@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 
 export default async function DebugPage() {
   // Log cookies for debugging
+  const supabase = await createClient(cookies());
   const cookieStore = await cookies();
   const supabase = await createClient(cookies());
   const allCookies = cookieStore.getAll();

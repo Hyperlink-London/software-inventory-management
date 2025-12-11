@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 
-import { useUser, getProfileID } from "@/contexts/UserContext";
+import { useUser } from "@/contexts/UserContext";
 import { TagSelector } from "@/components/TagSelector";
 import { TagOption } from "@/hooks/useTagSelector";
 
@@ -55,16 +55,7 @@ export default function AddItemPage() {
     tags: [],
   });
 
-  useEffect(() => {
-    (async () => {
-      const profileID = await getProfileID();
-      setFormData({
-        ...formData,
-        id: profileID,
-      });
-      console.log("profileID: ", profileID);
-    })();
-  }, [loading]);
+  // No longer need to load profile ID - RPC functions handle this automatically
 
   const [availableTags, setAvailableTags] = useState<TagOption[]>([]);
   const [isLoadingTags, setIsLoadingTags] = useState(true);
@@ -166,21 +157,14 @@ export default function AddItemPage() {
       }
 
       // ============================
-      // Insert into items table
+      // Create item using RPC function
       // ============================
-      const { data: itemData, error: itemError } = await supabase
-        .from("items")
-        .insert([
-          {
-            created_by: formData.id,
-            item_name: formData.name,
-            quantity: formData.quantity,
-            notes: formData.notes,
-            image_URL: image_URL,
-          },
-        ])
-        .select()
-        .single();
+      const { data: itemData, error: itemError } = await supabase.rpc("create_item", {
+        p_item_name: formData.name,
+        p_quantity: formData.quantity,
+        p_notes: formData.notes || null,
+        p_image_url: image_URL || null,
+      });
 
       // error should be null if insert was successful
       if (itemError) {
@@ -189,13 +173,16 @@ export default function AddItemPage() {
         return;
       }
 
+      // RPC returns array, get first item
+      const item = Array.isArray(itemData) ? itemData[0] : itemData;
+
       // Insert item tags if any were selected
       if (formData.tags.length > 0) {
         const { data: itemTagData, error: itemTagError } = await supabase
           .from("itemtags")
           .insert(
             formData.tags.map((tagId) => ({
-              item_id: itemData.id,
+              item_id: item.id,
               tag_id: tagId,
             })),
           );
@@ -214,7 +201,7 @@ export default function AddItemPage() {
       alert("Item added successfully!");
 
       setFormData({
-        id: itemData.id,
+        id: "",
         name: "",
         image: null,
         notes: "",
