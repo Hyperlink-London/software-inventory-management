@@ -6,7 +6,6 @@ export default async function DebugPage() {
   // Log cookies for debugging
   const supabase = await createClient(cookies());
   const cookieStore = await cookies();
-  const supabase = await createClient(cookies());
   const allCookies = cookieStore.getAll();
   console.log("Debug page - Cookies:", {
     count: allCookies.length,
