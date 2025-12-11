@@ -115,19 +115,19 @@ export default async function Dashboard() {
   }
 
   // Fetch checkouts
-  type CheckoutItem = {
-    id: string;
-    item_id: string;
-    item_name: string;
-    image_URL: string | null;
-    quantity: number;
-    sign_out_date: string;
-    expected_return_date: string | null;
-    returned_date: string | null;
-    recipient_username: string;
-    recipient_id: string;
-    recipient_teams?: string[];
-  };
+type CheckoutItem = {
+  id: string;
+  item_id: string;
+  item_name: string;
+  image_URL: string | null;
+  quantity: number;
+  sign_out_date: string;
+  expected_return_date: string | null;
+  returned_date: string | null;
+  recipient_full_name: string;
+  recipient_id: string;
+  recipient_teams?: string[];
+};
 
   let checkouts: CheckoutItem[] = [];
   if (user) {
@@ -151,6 +151,7 @@ export default async function Dashboard() {
           image_URL
         ),
         profiles(
+          full_name,
           username,
           teams
         )
@@ -188,6 +189,7 @@ export default async function Dashboard() {
             image_URL
           ),
           profiles(
+            full_name,
             username
           )
         `,
@@ -209,7 +211,7 @@ export default async function Dashboard() {
         sign_out_date: checkout.sign_out_date,
         expected_return_date: checkout.expected_return_date,
         returned_date: checkout.returned_date,
-        recipient_username: checkout.profiles?.username || "Unknown",
+        recipient_full_name: checkout.profiles?.full_name || checkout.profiles?.username || "Unknown",
         recipient_id: checkout.recipient_id,
         recipient_teams: checkout.profiles?.teams || [],
       }));

@@ -162,11 +162,21 @@ export async function GET(request: NextRequest) {
             .eq("supabase_uid", user.id)
             .maybeSingle();
 
+          // Extract full name from user metadata
+          const fullName = 
+            user.user_metadata?.full_name ||
+            user.user_metadata?.display_name ||
+            user.user_metadata?.name ||
+            user.user_metadata?.user_name ||
+            user.user_metadata?.preferred_username ||
+            user.email?.split("@")[0] ||
+            `user_${user.id.slice(0, 6)}`;
+
           if (existingProfile) {
-            // Update existing profile with teams
+            // Update existing profile with teams and full name
             const { error: updateError } = await supabase
               .from("profiles")
-              .update({ teams: orgTeams })
+              .update({ teams: orgTeams, full_name: fullName })
               .eq("id", existingProfile.id);
             
             if (updateError) {
@@ -190,6 +200,7 @@ export async function GET(request: NextRequest) {
               .insert({
                 supabase_uid: user.id,
                 username,
+                full_name: fullName,
                 email: user.email,
                 teams: orgTeams,
                 admin: false,
@@ -246,6 +257,89 @@ export async function GET(request: NextRequest) {
     }
     if (!user?.id) {
       console.warn("⚠️ No user ID available. Cannot fetch teams.");
+    }
+  }
+
+  // Update profile with full_name for all users (not just GitHub)
+  if (user?.id) {
+    try {
+      // Extract full name from user metadata
+      const fullName = 
+        user.user_metadata?.full_name ||
+        user.user_metadata?.display_name ||
+        user.user_metadata?.name ||
+        user.user_metadata?.user_name ||
+        user.user_metadata?.preferred_username ||
+        user.email?.split("@")[0] ||
+        `user_${user.id.slice(0, 6)}`;
+
+      // Check if profile exists
+      const { data: existingProfile } = await supabase
+        .from("profiles")
+        .select("id, full_name")
+        .eq("supabase_uid", user.id)
+        .maybeSingle();
+
+      if (existingProfile) {
+        // Update full_name if it's different or null
+        if (existingProfile.full_name !== fullName) {
+          const { error: updateError } = await supabase
+            .from("profiles")
+            .update({ full_name: fullName })
+            .eq("id", existingProfile.id);
+          
+          if (updateError) {
+            console.error("Failed to update profile with full_name:", updateError);
+            // If the error is about the column not existing, log a helpful message
+            if (updateError.message?.includes("column") && updateError.message?.includes("full_name")) {
+              console.error("⚠️ The 'full_name' column does not exist in the profiles table. Please add it with: ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS full_name text;");
+            }
+          } else {
+            console.log("✅ Updated profile with full_name:", fullName);
+          }
+        }
+      } else {
+        // Create profile if it doesn't exist (for non-GitHub logins)
+        const username = user.user_metadata?.user_name || 
+                        user.user_metadata?.preferred_username || 
+                        user.email?.split("@")[0] || 
+                        `user_${user.id.slice(0, 6)}`;
+        
+        const { error: insertError } = await supabase
+          .from("profiles")
+          .insert({
+            supabase_uid: user.id,
+            username,
+            full_name: fullName,
+            email: user.email,
+            admin: false,
+          });
+        
+        if (insertError) {
+          console.error("Failed to create profile:", insertError);
+          // If the error is about the column not existing, try without full_name
+          if (insertError.message?.includes("column") && insertError.message?.includes("full_name")) {
+            console.error("⚠️ The 'full_name' column does not exist. Creating profile without it. Please add the column with: ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS full_name text;");
+            // Try inserting without full_name
+            const { error: insertErrorWithoutFullName } = await supabase
+              .from("profiles")
+              .insert({
+                supabase_uid: user.id,
+                username,
+                email: user.email,
+                admin: false,
+              });
+            if (insertErrorWithoutFullName) {
+              console.error("Failed to create profile even without full_name:", insertErrorWithoutFullName);
+            }
+          }
+        } else {
+          console.log("✅ Created profile with full_name:", fullName);
+        }
+      }
+    } catch (error) {
+      console.error("❌ Error updating profile with full_name:", error);
+      // Don't fail the auth flow if profile update fails
     }
   }
 
