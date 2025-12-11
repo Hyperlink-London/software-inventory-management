@@ -48,6 +48,24 @@ export default async function DebugPage() {
     console.warn("Could not fetch claims:", error);
   }
 
+  // Fetch profile from database
+  let profile = null;
+  let profileError = null;
+  if (user?.id) {
+    try {
+      const { data: profileData, error: profileErr } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("supabase_uid", user.id)
+        .is("deleted_at", null)
+        .maybeSingle();
+      profile = profileData;
+      profileError = profileErr;
+    } catch (error) {
+      profileError = error as any;
+    }
+  }
+
   return (
     <div className="p-6 space-y-6">
       <h1 className="text-3xl font-bold">Debug Information</h1>
@@ -74,13 +92,21 @@ export default async function DebugPage() {
           {user || session?.user ? (
             <div className="space-y-2">
               <p>
-                <strong>Name:</strong>{" "}
+                <strong>Full Name:</strong>{" "}
+                {user?.user_metadata?.full_name ||
+                  user?.user_metadata?.display_name ||
+                  user?.user_metadata?.name ||
+                  session?.user?.user_metadata?.full_name ||
+                  session?.user?.user_metadata?.display_name ||
+                  session?.user?.user_metadata?.name ||
+                  "Not set"}
+              </p>
+              <p>
+                <strong>Username:</strong>{" "}
                 {user?.user_metadata?.user_name ||
                   user?.user_metadata?.preferred_username ||
-                  user?.user_metadata?.full_name ||
                   session?.user?.user_metadata?.user_name ||
                   session?.user?.user_metadata?.preferred_username ||
-                  session?.user?.user_metadata?.full_name ||
                   (user?.email || session?.user?.email)?.split("@")[0] ||
                   "Not set"}
               </p>
@@ -131,13 +157,59 @@ export default async function DebugPage() {
         </section>
 
         <section className="border border-zinc-200 dark:border-zinc-800 rounded-lg p-4">
-          <h2 className="text-xl font-semibold mb-3">User Metadata</h2>
+          <h2 className="text-xl font-semibold mb-3">User Metadata (from Auth)</h2>
           {user?.user_metadata || session?.user?.user_metadata ? (
             <pre className="bg-zinc-100 dark:bg-zinc-900 p-4 rounded overflow-auto text-sm">
               {JSON.stringify(user?.user_metadata || session?.user?.user_metadata, null, 2)}
             </pre>
           ) : (
             <p className="text-zinc-500">No metadata available</p>
+          )}
+        </section>
+
+        <section className="border border-zinc-200 dark:border-zinc-800 rounded-lg p-4">
+          <h2 className="text-xl font-semibold mb-3">Profile from Database</h2>
+          {profileError ? (
+            <div className="space-y-2">
+              <p className="text-red-600 dark:text-red-400">
+                <strong>Error:</strong> {profileError.message || "Failed to fetch profile"}
+              </p>
+            </div>
+          ) : profile ? (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <p>
+                  <strong>Profile ID:</strong> {profile.id}
+                </p>
+                <p>
+                  <strong>Username:</strong> {profile.username || "N/A"}
+                </p>
+                <p>
+                  <strong>Full Name:</strong> {profile.full_name || "N/A"}
+                </p>
+                <p>
+                  <strong>Email:</strong> {profile.email || "N/A"}
+                </p>
+                <p>
+                  <strong>Admin:</strong> {profile.admin ? "Yes" : "No"}
+                </p>
+                <p>
+                  <strong>Teams:</strong> {profile.teams ? JSON.stringify(profile.teams) : "N/A"}
+                </p>
+                <p>
+                  <strong>Created At:</strong>{" "}
+                  {profile.created_at ? new Date(profile.created_at).toLocaleString() : "N/A"}
+                </p>
+              </div>
+              <div>
+                <p className="font-semibold mb-2">Full Profile Object:</p>
+                <pre className="bg-zinc-100 dark:bg-zinc-900 p-4 rounded overflow-auto text-sm">
+                  {JSON.stringify(profile, null, 2)}
+                </pre>
+              </div>
+            </div>
+          ) : (
+            <p className="text-zinc-500">No profile found in database</p>
           )}
         </section>
 

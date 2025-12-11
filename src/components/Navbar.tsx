@@ -27,15 +27,29 @@ export default function Navbar() {
         return;
       }
 
-      // Get full name from user metadata
-      const fullName = 
+      // Get full name from user metadata first
+      let fullName = 
         user.user_metadata?.full_name ||
         user.user_metadata?.display_name ||
         user.user_metadata?.name ||
-        user.user_metadata?.user_name ||
-        user.user_metadata?.preferred_username ||
-        user.email?.split("@")[0] ||
         null;
+
+      // If no full name from metadata, fall back to username from profiles table
+      if (!fullName) {
+        const supabase = createClient();
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("username")
+          .eq("supabase_uid", user.id)
+          .is("deleted_at", null)
+          .single();
+
+        fullName = profile?.username || 
+                   user.user_metadata?.user_name ||
+                   user.user_metadata?.preferred_username ||
+                   user.email?.split("@")[0] ||
+                   null;
+      }
 
       setFullName(fullName);
     }

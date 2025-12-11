@@ -147,6 +147,7 @@ export default async function ItemDetailPage({ params }: ItemDetailPageProps) {
         ),
         profiles(
           full_name,
+          username,
           teams
         )
       `)
@@ -175,7 +176,8 @@ export default async function ItemDetailPage({ params }: ItemDetailPageProps) {
             image_URL
           ),
           profiles(
-            full_name
+            full_name,
+            username
           )
         `)
         .eq("item_id", id)
@@ -196,7 +198,7 @@ export default async function ItemDetailPage({ params }: ItemDetailPageProps) {
         sign_out_date: checkout.sign_out_date,
         expected_return_date: checkout.expected_return_date,
         returned_date: checkout.returned_date,
-        recipient_full_name: checkout.profiles?.full_name || "Unknown",
+        recipient_full_name: checkout.profiles?.full_name || checkout.profiles?.username || "Unknown",
         recipient_id: checkout.recipient_id,
         recipient_teams: checkout.profiles?.teams || [],
       }));
