@@ -9,12 +9,17 @@ export default function GitHubSignInButton() {
     const urlParams = new URLSearchParams(window.location.search);
     const redirectTo = urlParams.get("redirect_to") || "/";
     
-    console.log("Starting GitHub OAuth...");
+    // Ensure we use the correct origin (works in both dev and production)
+    const origin = typeof window !== "undefined" ? window.location.origin : "";
+    const callbackUrl = `${origin}/auth/callback?redirect_to=${encodeURIComponent(redirectTo)}`;
+    
+    console.log("Starting GitHub OAuth...", { origin, callbackUrl });
+    
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: "github",
       options: {
         scopes: "read:org read:user user:email",
-        redirectTo: `${window.location.origin}/auth/callback?redirect_to=${encodeURIComponent(redirectTo)}`,
+        redirectTo: callbackUrl,
         queryParams: {
           access_type: 'offline',
           prompt: 'consent',

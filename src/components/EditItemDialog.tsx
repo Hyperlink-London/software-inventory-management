@@ -41,6 +41,7 @@ type ItemWithTags = {
   quantity: number;
   notes: string | null;
   image_URL: string | null;
+  created_by: string | null;
   tags: Array<{
     id: string;
     name: string;
@@ -63,7 +64,12 @@ type EditItemDialogProps = {
   onSuccess?: (updatedItem?: ItemWithTags, deletedItemId?: string) => void;
 };
 
-export function EditItemDialog({ open, onOpenChange, item, onSuccess }: EditItemDialogProps) {
+export function EditItemDialog({
+  open,
+  onOpenChange,
+  item,
+  onSuccess,
+}: EditItemDialogProps) {
   const [formData, setFormData] = useState<ItemData>({
     name: "",
     image: null,
@@ -141,8 +147,28 @@ export function EditItemDialog({ open, onOpenChange, item, onSuccess }: EditItem
     }));
   };
 
+  const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2MB
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files ? e.target.files[0] : null;
+
+    if (!file) return;
+
+    // Validate type
+    if (!file.type.startsWith("image/")) {
+      alert("Please select a valid image file.");
+      e.target.value = ""; // Clear invalid file
+      return;
+    }
+
+    // Validate size
+    if (file.size > MAX_FILE_SIZE) {
+      alert("Image must be under 2MB.");
+      e.target.value = ""; // Clear invalid file
+      return;
+    }
+
+    // Passed validation
     setFormData((prev) => ({
       ...prev,
       image: file,
@@ -250,19 +276,16 @@ export function EditItemDialog({ open, onOpenChange, item, onSuccess }: EditItem
       console.log("Update successful, data:", updatedItemData);
 
       // Delete existing item tags
-      await supabase
-        .from("itemtags")
-        .delete()
-        .eq("item_id", item.id);
+      await supabase.from("itemtags").delete().eq("item_id", item.id);
 
       // Insert new item tags if any were selected
       if (formData.tags.length > 0) {
         // Ensure all tags exist in the tags table
         const tagIdsToLink: string[] = [];
-        
+
         for (const tagIdOrName of formData.tags) {
-          const existingTag = availableTags.find(t => t.id === tagIdOrName);
-          
+          const existingTag = availableTags.find((t) => t.id === tagIdOrName);
+
           if (existingTag) {
             tagIdsToLink.push(existingTag.id);
           } else {
@@ -280,7 +303,7 @@ export function EditItemDialog({ open, onOpenChange, item, onSuccess }: EditItem
                 .select("id")
                 .eq("name", tagIdOrName)
                 .single();
-              
+
               if (foundTag) {
                 tagIdsToLink.push(foundTag.id);
               } else {
@@ -311,19 +334,22 @@ export function EditItemDialog({ open, onOpenChange, item, onSuccess }: EditItem
       // Fetch updated item with tags for optimistic update
       const { data: itemWithTagsData } = await supabase
         .from("items")
-        .select(`
+        .select(
+          `
           id,
           item_name,
           quantity,
           notes,
           image_URL,
+          created_by,
           itemtags(
             tags(
               id,
               name
             )
           )
-        `)
+        `,
+        )
         .eq("id", item.id)
         .single();
 
@@ -335,8 +361,11 @@ export function EditItemDialog({ open, onOpenChange, item, onSuccess }: EditItem
           quantity: itemWithTagsData.quantity,
           notes: itemWithTagsData.notes,
           image_URL: itemWithTagsData.image_URL,
+          created_by: itemWithTagsData.created_by,
           tags: (itemWithTagsData.itemtags || [])
-            .filter((it: any) => it.tags && !it.tags.deleted_at && !it.deleted_at)
+            .filter(
+              (it: any) => it.tags && !it.tags.deleted_at && !it.deleted_at,
+            )
             .map((it: any) => ({
               id: it.tags.id,
               name: it.tags.name,
@@ -346,7 +375,7 @@ export function EditItemDialog({ open, onOpenChange, item, onSuccess }: EditItem
 
       toast.success("Item updated successfully!");
       onOpenChange(false);
-      
+
       if (onSuccess) {
         onSuccess(updatedItem);
       }
@@ -375,7 +404,7 @@ export function EditItemDialog({ open, onOpenChange, item, onSuccess }: EditItem
 
       toast.success("Item deleted successfully!");
       onOpenChange(false);
-      
+
       if (onSuccess) {
         onSuccess(undefined, item.id);
       }
@@ -422,7 +451,9 @@ export function EditItemDialog({ open, onOpenChange, item, onSuccess }: EditItem
                   alt={formData.name}
                   className="h-32 w-32 object-cover rounded-md border"
                 />
-                <p className="text-xs text-muted-foreground mt-1">Current image</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Current image
+                </p>
               </div>
             )}
             <Input
@@ -433,7 +464,8 @@ export function EditItemDialog({ open, onOpenChange, item, onSuccess }: EditItem
               accept="image/*"
             />
             <p className="text-xs text-muted-foreground">
-              Leave empty to keep current image, or select a new image to replace it.
+              Leave empty to keep current image, or select a new image to
+              replace it.
             </p>
           </div>
 
@@ -490,7 +522,11 @@ export function EditItemDialog({ open, onOpenChange, item, onSuccess }: EditItem
               >
                 Cancel
               </Button>
-              <Button type="submit" disabled={isSubmitting || isDeleting} className="flex-1 sm:flex-initial h-11 sm:h-10">
+              <Button
+                type="submit"
+                disabled={isSubmitting || isDeleting}
+                className="flex-1 sm:flex-initial h-11 sm:h-10"
+              >
                 {isSubmitting ? "Saving..." : "Save Changes"}
               </Button>
             </div>
@@ -516,8 +552,12 @@ export function EditItemDialog({ open, onOpenChange, item, onSuccess }: EditItem
           </DialogHeader>
           <div className="py-4">
             <p className="text-sm text-muted-foreground">
-              Are you sure you want to delete <span className="font-semibold text-foreground">"{item?.item_name}"</span>? 
-              This will permanently remove the item and all associated data from the system.
+              Are you sure you want to delete{" "}
+              <span className="font-semibold text-foreground">
+                "{item?.item_name}"
+              </span>
+              ? This will permanently remove the item and all associated data
+              from the system.
             </p>
           </div>
           <DialogFooter className="flex-col sm:flex-row gap-2">
@@ -555,4 +595,3 @@ export function EditItemDialog({ open, onOpenChange, item, onSuccess }: EditItem
     </Dialog>
   );
 }
-
