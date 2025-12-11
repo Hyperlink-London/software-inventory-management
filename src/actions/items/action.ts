@@ -28,12 +28,40 @@ export async function getItemById(id: ItemId) {
   return { id } as any;
 }
 
-export async function createItem(input: ItemInput) {
-  // const supabase = createClient(cookies());
-  // const { data, error } = await supabase.from("items").insert(input).select("*").single();
-  // if (error) throw error;
-  // return data;
-  return { id: "new-id", ...input } as any;
+export type CreateItemInput = {
+  name: string;
+  quantity: number;
+  notes?: string | null;
+  image_url?: string | null;
+};
+
+export async function createItem(input: CreateItemInput) {
+  const supabase = await createClient(cookies());
+  
+  // Use RPC function to create item - automatically handles user ID
+  const { data: itemData, error: itemError } = await supabase.rpc("create_item", {
+    p_item_name: input.name,
+    p_quantity: input.quantity,
+    p_notes: input.notes || null,
+    p_image_url: input.image_url || null,
+  });
+
+  if (itemError) {
+    throw new Error(`Failed to create item: ${itemError.message || itemError.details || "Unknown error"}`);
+  }
+
+  if (!itemData || (Array.isArray(itemData) && itemData.length === 0)) {
+    throw new Error("Failed to create item: No data returned");
+  }
+
+  // RPC returns array, get first item
+  const item = Array.isArray(itemData) ? itemData[0] : itemData;
+  
+  if (!item || !item.id) {
+    throw new Error("Failed to create item: Invalid response");
+  }
+
+  return item;
 }
 
 export async function updateItem(id: ItemId, input: Partial<ItemInput>) {
@@ -45,10 +73,80 @@ export async function updateItem(id: ItemId, input: Partial<ItemInput>) {
 }
 
 export async function deleteItem(id: ItemId) {
-  // const supabase = createClient(cookies());
-  // const { error } = await supabase.from("items").delete().eq("id", id);
-  // if (error) throw error;
-  return { id, deleted: true } as const;
+  const supabase = await createClient(cookies());
+
+  try {
+    // Get the item to retrieve its image URL
+    const { data: itemData, error: fetchError } = await supabase
+      .from("items")
+      .select("image_URL")
+      .eq("id", id)
+      .single();
+
+    if (fetchError) {
+      throw new Error("Item not found");
+    }
+
+    // Delete image from storage if it exists using RPC (same as update flow)
+    if (itemData?.image_URL) {
+      try {
+        const { data: deleteResult, error: deleteError } = await supabase.rpc("delete_image_from_storage", {
+          p_image_url: itemData.image_URL
+        });
+        
+        if (deleteError) {
+          console.warn("RPC delete image failed:", deleteError);
+          // Continue with item deletion even if image deletion fails
+        } else if (deleteResult && !deleteResult[0]?.success) {
+          console.warn("Image deletion unsuccessful:", deleteResult[0]?.message);
+          // Continue with item deletion even if image deletion fails
+        } else {
+          console.log("Old image deleted successfully via RPC");
+        }
+      } catch (error) {
+        console.warn("Error calling delete image RPC:", error);
+        // Continue with item deletion even if image deletion fails
+      }
+    }
+
+    // Soft delete the item and clear image URL
+    const { error: deleteError } = await supabase
+      .from("items")
+      .update({ deleted_at: new Date().toISOString(), image_URL: null })
+      .eq("id", id);
+
+    if (deleteError) {
+      throw new Error(`Failed to delete item: ${deleteError.message}`);
+    }
+
+    // Soft delete related itemtags
+    const { error: tagDeleteError } = await supabase
+      .from("itemtags")
+      .update({ deleted_at: new Date().toISOString() })
+      .eq("item_id", id)
+      .is("deleted_at", null);
+
+    if (tagDeleteError) {
+      console.warn("Failed to delete item tags:", tagDeleteError);
+      // Don't fail the entire deletion if tags deletion fails
+    }
+
+    // Soft delete related itemsignouts
+    const { error: signoutDeleteError } = await supabase
+      .from("itemsignouts")
+      .update({ deleted_at: new Date().toISOString() })
+      .eq("item_id", id)
+      .is("deleted_at", null);
+
+    if (signoutDeleteError) {
+      console.warn("Failed to delete item signouts:", signoutDeleteError);
+      // Don't fail the entire deletion if signouts deletion fails
+    }
+
+    return { id, deleted: true } as const;
+  } catch (error) {
+    throw new Error(`Failed to delete item: ${error instanceof Error ? error.message : "Unknown error"}`);
+  }
 }
 
 export async function signOutItem(id: ItemId, userId?: string) {
@@ -63,6 +161,43 @@ export async function signOutItem(id: ItemId, userId?: string) {
   // if (error) throw error;
   // return data;
   return { id, checkedOutBy: userId ?? null } as any;
+}
+
+export type CreateTagInput = {
+  name: string;
+};
+
+export async function createTag(input: CreateTagInput) {
+  const supabase = await createClient(cookies());
+  
+  // Use RPC function to create tag - automatically handles user ID
+  const { data: tagData, error: tagError } = await supabase.rpc("create_tag", {
+    p_name: input.name,
+  });
+
+  if (tagError) {
+    throw new Error(`Failed to create tag: ${tagError.message || tagError.details || "Unknown error"}`);
+  }
+
+  if (!tagData) {
+    throw new Error("Failed to create tag: No ID returned");
+  }
+
+  // RPC now returns UUID directly, not an object
+  const tagId = tagData;
+  
+  // Fetch the complete tag data using the returned ID
+  const { data: tag, error: fetchError } = await supabase
+    .from("tags")
+    .select("*")
+    .eq("id", tagId)
+    .single();
+
+  if (fetchError || !tag) {
+    throw new Error("Failed to fetch created tag data");
+  }
+
+  return tag;
 }
 
 
