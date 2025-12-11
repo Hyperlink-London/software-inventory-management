@@ -15,7 +15,7 @@ type CheckoutItem = {
   sign_out_date: string;
   expected_return_date: string | null;
   returned_date: string | null;
-  recipient_username: string;
+  recipient_full_name: string;
   recipient_id: string;
   recipient_teams?: string[];
 };
@@ -83,7 +83,7 @@ export default async function CheckoutsPage() {
           image_URL
         ),
         profiles(
-          username,
+          full_name,
           teams
         )
       `)
@@ -111,7 +111,7 @@ export default async function CheckoutsPage() {
             image_URL
           ),
           profiles(
-            username
+            full_name
           )
         `)
         .is("deleted_at", null)
@@ -131,7 +131,7 @@ export default async function CheckoutsPage() {
         sign_out_date: checkout.sign_out_date,
         expected_return_date: checkout.expected_return_date,
         returned_date: checkout.returned_date,
-        recipient_username: checkout.profiles?.username || "Unknown",
+        recipient_full_name: checkout.profiles?.full_name || "Unknown",
         recipient_id: checkout.recipient_id,
         recipient_teams: checkout.profiles?.teams || [],
       }));

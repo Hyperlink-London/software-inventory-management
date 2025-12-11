@@ -38,7 +38,7 @@ type CheckoutItem = {
   sign_out_date: string;
   expected_return_date: string | null;
   returned_date: string | null;
-  recipient_username: string;
+  recipient_full_name: string;
   recipient_id: string;
   recipient_teams?: string[];
 };
@@ -133,7 +133,7 @@ export function CheckoutTable({ checkouts, currentUserId, userTeams = [] }: Chec
       filtered = filtered.filter((checkout) => {
         return (
           checkout.item_name.toLowerCase().includes(query) ||
-          checkout.recipient_username.toLowerCase().includes(query) ||
+          checkout.recipient_full_name.toLowerCase().includes(query) ||
           checkout.id.toLowerCase().includes(query)
         );
       });
@@ -503,7 +503,7 @@ export function CheckoutTable({ checkouts, currentUserId, userTeams = [] }: Chec
                     <TableCell className="py-2">
                       <div className="flex items-center gap-2">
                         <User className="h-3 w-3 text-muted-foreground" />
-                        <span className="text-sm">{checkout.recipient_username}</span>
+                        <span className="text-sm">{checkout.recipient_full_name}</span>
                       </div>
                     </TableCell>
                   )}
@@ -593,7 +593,7 @@ export function CheckoutTable({ checkouts, currentUserId, userTeams = [] }: Chec
                     <TableCell className="py-2">
                       <div className="flex items-center gap-2">
                         <User className="h-3 w-3 text-muted-foreground" />
-                        <span className="text-sm">{checkout.recipient_username}</span>
+                        <span className="text-sm">{checkout.recipient_full_name}</span>
                       </div>
                     </TableCell>
                   )}

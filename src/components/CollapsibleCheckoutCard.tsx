@@ -17,7 +17,7 @@ type CheckoutItem = {
   sign_out_date: string;
   expected_return_date: string | null;
   returned_date: string | null;
-  recipient_username: string;
+  recipient_full_name: string;
   recipient_id: string;
 };
 

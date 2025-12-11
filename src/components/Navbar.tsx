@@ -16,30 +16,32 @@ import { ChevronDown, LayoutDashboard, Package, ShoppingCart } from "lucide-reac
 
 export default function Navbar() {
   const { user } = useUser();
-  const [username, setUsername] = React.useState<string | null>(null);
+  const [fullName, setFullName] = React.useState<string | null>(null);
   const [isScrolled, setIsScrolled] = React.useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
 
   React.useEffect(() => {
-    async function fetchUsername() {
+    async function fetchFullName() {
       if (!user?.id) {
-        setUsername(null);
+        setFullName(null);
         return;
       }
 
-      const supabase = createClient();
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("username")
-        .eq("supabase_uid", user.id)
-        .is("deleted_at", null)
-        .single();
+      // Get full name from user metadata
+      const fullName = 
+        user.user_metadata?.full_name ||
+        user.user_metadata?.display_name ||
+        user.user_metadata?.name ||
+        user.user_metadata?.user_name ||
+        user.user_metadata?.preferred_username ||
+        user.email?.split("@")[0] ||
+        null;
 
-      setUsername(profile?.username || null);
+      setFullName(fullName);
     }
 
-    fetchUsername();
-  }, [user?.id]);
+    fetchFullName();
+  }, [user?.id, user?.user_metadata, user?.email]);
 
   React.useEffect(() => {
     const handleScroll = () => {
@@ -94,14 +96,14 @@ export default function Navbar() {
           </nav>
 
           {/* Mobile & Desktop User Menu */}
-          {username && (
+          {fullName && (
             <>
               {/* Desktop: Hover dropdown */}
               <div className="hidden md:block group relative flex items-center">
                 <span
                   className="text-sm text-muted-foreground cursor-pointer hover:text-foreground transition-colors px-3 py-1.5 rounded-md hover:bg-accent"
                 >
-                  {username}
+                  {fullName}
                 </span>
                 <div className="absolute right-0 top-full mt-1 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
                   <div className="bg-popover border rounded-md shadow-md p-1">
@@ -119,7 +121,7 @@ export default function Navbar() {
                     className="md:hidden flex items-center gap-1.5 px-2 sm:px-3 h-9"
                   >
                     <span className="text-sm font-medium truncate max-w-[100px] sm:max-w-none">
-                      {username}
+                      {fullName}
                     </span>
                     <ChevronDown className="h-4 w-4 shrink-0" />
                   </Button>
