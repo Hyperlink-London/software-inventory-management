@@ -3,26 +3,15 @@
 
 import * as React from 'react';
 import { LogOut } from 'lucide-react';
-import { createClient } from '@/utils/supabase/client';
-import { Button } from '@/components/ui/button'; // Assuming shadcn Button
+import { Button } from '@/components/ui/button';
 
 export const LogoutButton: React.FC = () => {
-  const handleLogout = async () => {
-    try {
-      const supabase = createClient();
-      // Calls the Supabase signOut method
-      const { error } = await supabase.auth.signOut();
-      
-      if (error) {
-        console.error('Error logging out:', error);
-        alert('Failed to log out. Please try again.');
-      } else {
-        // Optional: Redirect the user or show a success message
-        console.log('User logged out successfully.');
-      }
-    } catch (e) {
-      console.error('Logout Exception:', e);
-    }
+  const [isLoggingOut, setIsLoggingOut] = React.useState(false);
+
+  const handleLogout = () => {
+    setIsLoggingOut(true);
+    // Use the server-side signout route to properly clear session and cookies
+    window.location.href = '/auth/signout';
   };
 
   return (
@@ -31,9 +20,10 @@ export const LogoutButton: React.FC = () => {
       variant="outline" 
       size="sm"
       className="flex items-center gap-2"
+      disabled={isLoggingOut}
     >
       <LogOut className="h-4 w-4" />
-      Logout
+      {isLoggingOut ? 'Logging out...' : 'Logout'}
     </Button>
   );
 };

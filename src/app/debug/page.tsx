@@ -3,19 +3,9 @@ import DebugInfo from "@/components/DebugInfo";
 import { cookies } from "next/headers";
 
 export default async function DebugPage() {
-  // Log cookies for debugging
   const supabase = await createClient(cookies());
   const cookieStore = await cookies();
   const allCookies = cookieStore.getAll();
-  console.log("Debug page - Cookies:", {
-    count: allCookies.length,
-    names: allCookies.map(c => c.name),
-    supabaseCookies: allCookies.filter(c => 
-      c.name.includes("supabase") || 
-      c.name.includes("sb-") || 
-      c.name.includes("auth")
-    ).map(c => ({ name: c.name, hasValue: !!c.value, valueLength: c.value?.length }))
-  });
   
   // Use getUser() for consistency with middleware and to get fresh session
   const {
@@ -29,23 +19,13 @@ export default async function DebugPage() {
     error: sessionError,
   } = await supabase.auth.getSession();
 
-  console.log("Debug page - Session check:", {
-    hasUser: !!user,
-    hasSession: !!session,
-    userError: userError?.message,
-    sessionError: sessionError?.message,
-    userId: user?.id,
-    sessionUserId: session?.user?.id,
-  });
-
   // Try to get claims, but handle if it's not available or errors
   let claims = null;
   try {
     const { data: claimsData } = await supabase.auth.getClaims();
     claims = claimsData ?? null;
-  } catch (error) {
+  } catch {
     // getClaims() might not be available or might error
-    console.warn("Could not fetch claims:", error);
   }
 
   // Fetch profile from database

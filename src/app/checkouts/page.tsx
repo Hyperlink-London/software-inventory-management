@@ -39,7 +39,6 @@ export default async function CheckoutsPage() {
         .single();
       
       if (profileError) {
-        console.error("Error fetching profile:", profileError);
         // If teams column doesn't exist, try without it
         if (profileError.message?.includes("column") && profileError.message?.includes("teams")) {
           const { data: profileWithoutTeams } = await supabase
@@ -50,14 +49,13 @@ export default async function CheckoutsPage() {
             .single();
           userProfileId = profileWithoutTeams?.id || null;
           userTeams = [];
-          console.warn("⚠️ Teams column not found. Please run migration: migrations/add_teams_to_profiles.sql");
         }
       } else {
         userProfileId = profile?.id || null;
         userTeams = (profile?.teams as string[]) || [];
       }
-    } catch (error) {
-      console.error("Error in profile fetch:", error);
+    } catch {
+      // Profile fetch failed
     }
   }
 
@@ -96,7 +94,6 @@ export default async function CheckoutsPage() {
 
     // If error is about teams column, try without it
     if (checkoutsError && checkoutsError.message?.includes("column") && checkoutsError.message?.includes("teams")) {
-      console.warn("⚠️ Teams column not found in profiles. Fetching checkouts without teams. Please run migration: migrations/add_teams_to_profiles.sql");
       const { data: dataWithoutTeams, error: errorWithoutTeams } = await supabase
         .from("itemsignouts")
         .select(`

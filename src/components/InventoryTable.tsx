@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import {
   Search,
@@ -12,6 +12,9 @@ import {
   XCircle,
   ShoppingCart,
   Pencil,
+  ChevronLeft,
+  ChevronRight,
+  Loader2,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -53,9 +56,11 @@ type ItemWithTags = {
   id: string;
   item_name: string;
   quantity: number;
+  checked_out_quantity: number;
   notes: string | null;
   image_URL: string | null;
   created_by: string | null;
+  created_by_name: string | null;
   tags: Array<{
     id: string;
     name: string;
@@ -67,13 +72,98 @@ type InventoryTableProps = {
   stickyControls?: boolean;
   maxHeight?: string;
   onItemUpdate?: () => void;
+  userTeams?: string[];
 };
+
+const ITEMS_PER_PAGE = 10;
+
+// Reusable image component with loading state
+function ItemImage({
+  src,
+  alt,
+  size = "md",
+  className = "",
+}: {
+  src: string;
+  alt: string;
+  size?: "sm" | "md" | "lg" | "preview";
+  className?: string;
+}) {
+  const [isLoading, setIsLoading] = React.useState(true);
+
+  const sizeConfig = {
+    sm: { container: "h-16 w-16", sizes: "64px", quality: 60 },
+    md: { container: "h-20 w-20", sizes: "80px", quality: 60 },
+    lg: { container: "h-24 w-24", sizes: "96px", quality: 70 },
+    preview: { container: "w-full h-[70vh]", sizes: "(max-width: 768px) 100vw, 768px", quality: 85 },
+  };
+
+  const config = sizeConfig[size];
+
+  // Reset loading state when src changes
+  React.useEffect(() => {
+    setIsLoading(true);
+  }, [src]);
+
+  return (
+    <div className={`relative ${config.container} ${className}`}>
+      {isLoading && (
+        <div className="absolute inset-0 flex items-center justify-center bg-muted rounded-md">
+          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+        </div>
+      )}
+      <Image
+        src={src}
+        alt={alt}
+        fill
+        sizes={config.sizes}
+        quality={config.quality}
+        className="object-cover rounded-md"
+        onLoad={() => setIsLoading(false)}
+      />
+    </div>
+  );
+}
+
+// Preview image with loading state (object-contain for full view)
+function PreviewImage({
+  src,
+  alt,
+}: {
+  src: string;
+  alt: string;
+}) {
+  const [isLoading, setIsLoading] = React.useState(true);
+
+  // Reset loading state when src changes
+  React.useEffect(() => {
+    setIsLoading(true);
+  }, [src]);
+
+  return (
+    <div className="relative w-full min-h-[50vh] flex items-center justify-center">
+      {isLoading && (
+        <div className="absolute inset-0 flex items-center justify-center bg-muted rounded-md">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      )}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={src}
+        alt={alt}
+        className="max-h-[70vh] max-w-full rounded-md object-contain"
+        onLoad={() => setIsLoading(false)}
+      />
+    </div>
+  );
+}
 
 export function InventoryTable({
   items,
   stickyControls = false,
   maxHeight = "none",
   onItemUpdate,
+  userTeams = [],
 }: InventoryTableProps) {
   const router = useRouter();
   const [localItems, setLocalItems] = React.useState<ItemWithTags[]>(items);
@@ -89,25 +179,31 @@ export function InventoryTable({
   const [imageDialogOpen, setImageDialogOpen] = React.useState(false);
   const [selectedImageItem, setSelectedImageItem] =
     React.useState<ItemWithTags | null>(null);
+  const [currentPage, setCurrentPage] = React.useState(1);
 
   // get Permissions
-  const [isUserAdmin, setIsUserAdmin] = React.useState(false);
-  const [profileID, setProfileID] = React.useState<String>("");
+  const [isUserAdmin, setIsUserAdmin] = React.useState(
+    userTeams.includes("admin"),
+  );
+  const [profileID, setProfileID] = React.useState<string>("");
 
   React.useEffect(() => {
     async function checkPermissions() {
-      try {
-        const resultA = await isAdmin();
-        setIsUserAdmin(!!resultA); // guarantees boolean
-      } catch (e) {
-        console.error("Failed to check admin:", e);
-        setIsUserAdmin(false);
+      if (userTeams.includes("admin")) {
+        setIsUserAdmin(true);
+      } else {
+        try {
+          const resultA = await isAdmin();
+          setIsUserAdmin(!!resultA); // guarantees boolean
+        } catch {
+          setIsUserAdmin(false);
+        }
       }
       const resultID = await getProfileID();
-      setProfileID(resultID);
+      setProfileID(resultID ?? "");
     }
     checkPermissions();
-  }, []);
+  }, [userTeams]);
 
   // Sync local items with props when they change
   React.useEffect(() => {
@@ -148,6 +244,17 @@ export function InventoryTable({
       return matchesSearch && matchesTags;
     });
   }, [localItems, searchQuery, selectedTags]);
+
+  // Pagination calculations
+  const totalPages = Math.ceil(filteredItems.length / ITEMS_PER_PAGE);
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+  const endIndex = startIndex + ITEMS_PER_PAGE;
+  const paginatedItems = filteredItems.slice(startIndex, endIndex);
+
+  // Reset to page 1 when filters change
+  React.useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, selectedTags]);
 
   const toggleTag = (tagName: string) => {
     setSelectedTags((prev) =>
@@ -234,8 +341,8 @@ export function InventoryTable({
     expected_return_date: string;
   }) => {
     await checkoutItem(data);
-    // The page will be revalidated by the server action
-    window.location.reload();
+    // Refresh server data without full page reload
+    router.refresh();
   };
 
   const controlsSection = (
@@ -337,9 +444,39 @@ export function InventoryTable({
         </div>
       )}
 
-      {/* Results Count */}
-      <div className="text-sm text-muted-foreground">
-        Showing {filteredItems.length} of {localItems.length} items
+      {/* Results Count and Pagination */}
+      <div className="flex items-center justify-between">
+        <div className="text-sm text-muted-foreground">
+          Showing {paginatedItems.length > 0 ? startIndex + 1 : 0}–{Math.min(endIndex, filteredItems.length)} of {filteredItems.length} items
+          {filteredItems.length !== localItems.length && ` (${localItems.length} total)`}
+        </div>
+        {totalPages > 1 && (
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+              className="h-8 w-8 p-0"
+            >
+              <ChevronLeft className="h-4 w-4" />
+              <span className="sr-only">Previous page</span>
+            </Button>
+            <span className="text-sm text-muted-foreground min-w-[80px] text-center">
+              {currentPage} of {totalPages}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+              className="h-8 w-8 p-0"
+            >
+              <ChevronRight className="h-4 w-4" />
+              <span className="sr-only">Next page</span>
+            </Button>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -347,7 +484,7 @@ export function InventoryTable({
   // Mobile card view component
   const mobileCardView = (
     <div className="space-y-3 sm:hidden">
-      {filteredItems.map((item) => (
+      {paginatedItems.map((item) => (
         <div
           key={item.id}
           className="rounded-lg border p-4 space-y-3 cursor-pointer"
@@ -369,12 +506,12 @@ export function InventoryTable({
                   e.stopPropagation();
                   handleImageClick(item);
                 }}
-                className="relative h-20 w-20 flex-shrink-0 overflow-hidden rounded-md border border-border focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background"
+                className="flex-shrink-0 overflow-hidden rounded-md border border-border focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background"
               >
-                <img
+                <ItemImage
                   src={item.image_URL}
                   alt={item.item_name}
-                  className="h-full w-full object-cover"
+                  size="md"
                 />
               </button>
             ) : (
@@ -402,9 +539,15 @@ export function InventoryTable({
                         : "font-semibold"
                   }
                 >
-                  {item.quantity}
+                  {item.quantity} / {item.quantity + item.checked_out_quantity}
                 </span>
               </div>
+              {item.created_by_name && (
+                <div className="mt-1 flex items-center gap-2">
+                  <span className="text-sm text-muted-foreground">Logged by:</span>
+                  <span className="text-sm">{item.created_by_name}</span>
+                </div>
+              )}
             </div>
           </div>
 
@@ -461,7 +604,7 @@ export function InventoryTable({
 
   const tableSection = (
     <>
-      {filteredItems.length === 0 ? (
+      {paginatedItems.length === 0 ? (
         <div className="text-center py-12 text-muted-foreground">
           No items found matching your filters.
         </div>
@@ -472,20 +615,20 @@ export function InventoryTable({
 
           {/* Desktop Table View */}
           <div className="hidden sm:block rounded-md border overflow-x-auto">
-            <Table>
+            <Table style={{ tableLayout: 'fixed', width: '100%' }}>
               <TableHeader className="sticky top-0 bg-background z-10">
                 <TableRow>
-                  <TableHead className="w-[100px]">Image</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Item Name</TableHead>
-                  <TableHead>Quantity</TableHead>
-                  <TableHead>Tags</TableHead>
-                  <TableHead className="hidden md:table-cell">Notes</TableHead>
-                  <TableHead className="w-[180px]">Actions</TableHead>
+                  <TableHead style={{ width: '80px' }}>Image</TableHead>
+                  <TableHead style={{ width: '250px' }}>Item Name</TableHead>
+                  <TableHead style={{ width: '80px' }}>Qty</TableHead>
+                  <TableHead style={{ width: '150px' }}>Tags</TableHead>
+                  <TableHead style={{ width: '130px' }}>Logged by</TableHead>
+                  <TableHead className="hidden lg:table-cell">Notes</TableHead>
+                  <TableHead style={{ width: '200px' }}>Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredItems.map((item) => (
+                {paginatedItems.map((item) => (
                   <TableRow
                     key={item.id}
                     className="cursor-pointer"
@@ -506,12 +649,12 @@ export function InventoryTable({
                             e.stopPropagation();
                             handleImageClick(item);
                           }}
-                          className="relative h-16 w-16 overflow-hidden rounded-md border border-border focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background"
+                          className="overflow-hidden rounded-md border border-border focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background"
                         >
-                          <img
+                          <ItemImage
                             src={item.image_URL}
                             alt={item.item_name}
-                            className="h-full w-full object-cover"
+                            size="sm"
                           />
                         </button>
                       ) : (
@@ -520,15 +663,10 @@ export function InventoryTable({
                         </div>
                       )}
                     </TableCell>
-                    <TableCell>
-                      <div className="flex items-center">
-                        {getStatusIcon(item.quantity)}
-                      </div>
+                    <TableCell className="font-medium" style={{ maxWidth: '250px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      <span className="hover:underline" title={item.item_name}>{item.item_name}</span>
                     </TableCell>
-                    <TableCell className="font-medium">
-                      <span className="hover:underline">{item.item_name}</span>
-                    </TableCell>
-                    <TableCell>
+                    <TableCell style={{ whiteSpace: 'nowrap' }}>
                       <span
                         className={
                           item.quantity === 0
@@ -538,14 +676,14 @@ export function InventoryTable({
                               : ""
                         }
                       >
-                        {item.quantity}
+                        {item.quantity} / {item.quantity + item.checked_out_quantity}
                       </span>
                     </TableCell>
-                    <TableCell>
-                      <div className="flex flex-wrap gap-2">
+                    <TableCell className="overflow-hidden">
+                      <div className="flex flex-wrap gap-1 overflow-hidden">
                         {item.tags.length > 0 ? (
-                          item.tags.map((tag) => (
-                            <Badge key={tag.id} variant="secondary">
+                          item.tags.slice(0, 2).map((tag) => (
+                            <Badge key={tag.id} variant="secondary" className="text-xs">
                               {tag.name}
                             </Badge>
                           ))
@@ -554,15 +692,25 @@ export function InventoryTable({
                             No tags
                           </span>
                         )}
+                        {item.tags.length > 2 && (
+                          <Badge variant="outline" className="text-xs">
+                            +{item.tags.length - 2}
+                          </Badge>
+                        )}
                       </div>
                     </TableCell>
-                    <TableCell className="hidden md:table-cell text-muted-foreground">
-                      {item.notes || (
-                        <span className="text-muted-foreground">—</span>
-                      )}
+                    <TableCell className="text-muted-foreground" style={{ maxWidth: '130px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      <span title={item.created_by_name || undefined}>
+                        {item.created_by_name || "—"}
+                      </span>
                     </TableCell>
-                    <TableCell>
-                      <div className="flex gap-2">
+                    <TableCell className="hidden lg:table-cell text-muted-foreground" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      <span title={item.notes || undefined}>
+                        {item.notes || "—"}
+                      </span>
+                    </TableCell>
+                    <TableCell className="min-w-0">
+                      <div className="flex flex-col gap-2">
                         {(isUserAdmin || profileID == item.created_by) && (
                           <Button
                             variant="outline"
@@ -571,7 +719,7 @@ export function InventoryTable({
                               e.stopPropagation();
                               handleEditClick(item);
                             }}
-                            className="flex-1"
+                            className="w-full"
                           >
                             <Pencil className="mr-2 h-4 w-4" />
                             Edit
@@ -585,7 +733,7 @@ export function InventoryTable({
                             handleCheckoutClick(item);
                           }}
                           disabled={item.quantity === 0}
-                          className="flex-1"
+                          className="w-full"
                         >
                           <ShoppingCart className="mr-2 h-4 w-4" />
                           Checkout
@@ -597,6 +745,37 @@ export function InventoryTable({
               </TableBody>
             </Table>
           </div>
+          
+          {/* Bottom Pagination */}
+          {totalPages > 1 && (
+            <div className="flex justify-center mt-4">
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  className="h-8 w-8 p-0"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                  <span className="sr-only">Previous page</span>
+                </Button>
+                <span className="text-sm text-muted-foreground min-w-[80px] text-center">
+                  {currentPage} of {totalPages}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                  className="h-8 w-8 p-0"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                  <span className="sr-only">Next page</span>
+                </Button>
+              </div>
+            </div>
+          )}
         </>
       )}
     </>
@@ -633,11 +812,10 @@ export function InventoryTable({
                 <DialogHeader>
                   <DialogTitle>{selectedImageItem.item_name}</DialogTitle>
                 </DialogHeader>
-                <div className="mt-2 flex justify-center">
-                  <img
+                <div className="mt-2">
+                  <PreviewImage
                     src={selectedImageItem.image_URL}
                     alt={selectedImageItem.item_name}
-                    className="max-h-[70vh] w-auto rounded-md object-contain"
                   />
                 </div>
               </>
@@ -674,11 +852,10 @@ export function InventoryTable({
               <DialogHeader>
                 <DialogTitle>{selectedImageItem.item_name}</DialogTitle>
               </DialogHeader>
-              <div className="mt-2 flex justify-center">
-                <img
+              <div className="mt-2">
+                <PreviewImage
                   src={selectedImageItem.image_URL}
                   alt={selectedImageItem.item_name}
-                  className="max-h-[70vh] w-auto rounded-md object-contain"
                 />
               </div>
             </>

@@ -15,7 +15,6 @@ export async function getUserFullNames(uids: string[]): Promise<Record<string, s
   const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
   if (!supabaseUrl || !supabaseServiceKey) {
-    console.warn("Missing Supabase URL or Service Role Key. Full names will not be fetched.");
     // Return empty map - components will fall back to "Unknown"
     return {};
   }
@@ -35,7 +34,6 @@ export async function getUserFullNames(uids: string[]): Promise<Record<string, s
     const { data: { users }, error } = await supabaseAdmin.auth.admin.listUsers();
 
     if (error) {
-      console.error("Error fetching users list, trying individual fetches:", error);
       // Fallback: try individual fetches
       for (const uid of uids) {
         try {
@@ -46,8 +44,7 @@ export async function getUserFullNames(uids: string[]): Promise<Record<string, s
           } else {
             fullNamesMap[uid] = "Unknown";
           }
-        } catch (err) {
-          console.error(`Error fetching user ${uid}:`, err);
+        } catch {
           fullNamesMap[uid] = "Unknown";
         }
       }
@@ -66,8 +63,7 @@ export async function getUserFullNames(uids: string[]): Promise<Record<string, s
         }
       }
     }
-  } catch (error) {
-    console.error("Error in getUserFullNames:", error);
+  } catch {
     // Set all to "Unknown" on error
     for (const uid of uids) {
       fullNamesMap[uid] = "Unknown";

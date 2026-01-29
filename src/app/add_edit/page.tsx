@@ -24,7 +24,6 @@ const fetchAllTags = async (): Promise<TagOption[]> => {
   const { data, error } = await supabase.from("tags").select("id, name");
 
   if (error) {
-    console.error("Error fetching tags:", error);
     throw error;
   }
   // Supabase returns an array of objects matching the {id: string, name: string} format
@@ -74,9 +73,8 @@ export default function AddItemPage() {
         setIsLoadingTags(true);
         const data = await fetchAllTags();
         setAvailableTags(data);
-      } catch (error) {
-        console.error("Failed to load available tags:", error);
-        // Optionally handle error state here
+      } catch {
+        // Failed to load tags
       } finally {
         setIsLoadingTags(false);
       }
@@ -131,8 +129,6 @@ export default function AddItemPage() {
       setIsSubmitting(true);
       const supabase = createClient();
 
-      console.log("Submitting form:", formData);
-
       // image upload logic
       let image_URL = null;
       if (formData.image) {
@@ -143,7 +139,6 @@ export default function AddItemPage() {
           .upload(fileName, formData.image);
 
         if (uploadError) {
-          console.error("Image upload failed:", uploadError);
           alert("Failed to upload image");
           return;
         }
@@ -168,7 +163,6 @@ export default function AddItemPage() {
 
       // error should be null if insert was successful
       if (itemError) {
-        console.error("Insert failed:", itemError);
         alert("Failed to add item");
         return;
       }
@@ -188,11 +182,9 @@ export default function AddItemPage() {
           );
 
         if (itemTagError) {
-          console.error("Inserting item tags failed:", itemTagError);
           alert("Item added but failed to add tags");
-        } else {
-          console.log("Item tags inserted:", itemTagData);
         }
+        void itemTagData;
       }
 
       // ============================
@@ -211,8 +203,7 @@ export default function AddItemPage() {
 
       // Redirect to items page
       router.push("/items");
-    } catch (error) {
-      console.error("Error submitting form:", error);
+    } catch {
       alert("An error occurred while adding the item");
     } finally {
       setIsSubmitting(false);

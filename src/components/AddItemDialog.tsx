@@ -29,7 +29,6 @@ const fetchAllTags = async (): Promise<TagOption[]> => {
   const { data, error } = await supabase.from("tags").select("id, name");
 
   if (error) {
-    console.error("Error fetching tags:", error);
     throw error;
   }
   return data as TagOption[];
@@ -78,8 +77,8 @@ export function AddItemDialog({
           setIsLoadingTags(true);
           const data = await fetchAllTags();
           setAvailableTags(data);
-        } catch (error) {
-          console.error("Failed to load available tags:", error);
+        } catch {
+          // Failed to load tags
         } finally {
           setIsLoadingTags(false);
         }
@@ -168,8 +167,6 @@ export function AddItemDialog({
       setIsSubmitting(true);
       const supabase = createClient();
 
-      console.log("Submitting form:", formData);
-
       // image upload logic
       let image_URL = null;
       if (formData.image) {
@@ -180,7 +177,6 @@ export function AddItemDialog({
           .upload(fileName, formData.image);
 
         if (uploadError) {
-          console.error("Image upload failed:", uploadError);
           toast.error("Failed to upload image");
           return;
         }
@@ -205,7 +201,6 @@ export function AddItemDialog({
           image_url: image_URL || null,
         });
       } catch (err) {
-        console.error("Failed to create item:", err);
         toast.error(`Failed to add item: ${err instanceof Error ? err.message : String(err)}`);
         return;
       }
@@ -230,8 +225,7 @@ export function AddItemDialog({
               if (newTag && newTag.id) {
                 tagIdsToLink.push(newTag.id);
               }
-            } catch (err) {
-              console.error("Failed to create new tag:", err);
+            } catch {
               // Try to find if tag was created by another process
               const { data: foundTag } = await supabase
                 .from("tags")
@@ -241,8 +235,6 @@ export function AddItemDialog({
 
               if (foundTag) {
                 tagIdsToLink.push(foundTag.id);
-              } else {
-                console.error("Could not create or find tag:", tagIdOrName);
               }
             }
           }
@@ -260,11 +252,9 @@ export function AddItemDialog({
             );
 
           if (itemTagError) {
-            console.error("Inserting item tags failed:", itemTagError);
             toast.warning("Item added but failed to add tags");
-          } else {
-            console.log("Item tags inserted:", itemTagData);
           }
+          void itemTagData;
         }
       }
 
@@ -287,8 +277,7 @@ export function AddItemDialog({
       if (onSuccess) {
         onSuccess();
       }
-    } catch (error) {
-      console.error("Error submitting form:", error);
+    } catch {
       toast.error("An error occurred while adding the item");
     } finally {
       setIsSubmitting(false);

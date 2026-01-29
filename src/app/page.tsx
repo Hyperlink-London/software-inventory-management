@@ -13,9 +13,11 @@ type ItemWithTags = {
   id: string;
   item_name: string;
   quantity: number;
+  checked_out_quantity: number;
   notes: string | null;
   image_URL: string | null;
   created_by: string | null;
+  created_by_name: string | null;
   tags: Array<{
     id: string;
     name: string;
@@ -42,7 +44,6 @@ export default async function Dashboard() {
         .single();
 
       if (profileError) {
-        console.error("Error fetching profile:", profileError);
         // If teams column doesn't exist, try without it
         if (
           profileError.message?.includes("column") &&
@@ -57,17 +58,14 @@ export default async function Dashboard() {
           username = profileWithoutTeams?.username || null;
           userProfileId = profileWithoutTeams?.id || null;
           userTeams = [];
-          console.warn(
-            "⚠️ Teams column not found. Please run migration: migrations/add_teams_to_profiles.sql",
-          );
         }
       } else {
         username = profile?.username || null;
         userProfileId = profile?.id || null;
         userTeams = (profile?.teams as string[]) || [];
       }
-    } catch (error) {
-      console.error("Error in profile fetch:", error);
+    } catch {
+      // Profile fetch failed
     }
   }
 
@@ -84,6 +82,10 @@ export default async function Dashboard() {
         notes,
         image_URL,
         created_by,
+        creator:profiles!items_created_by_fkey(
+          full_name,
+          username
+        ),
         itemtags(
           tags(
             id,
@@ -95,15 +97,33 @@ export default async function Dashboard() {
       .is("deleted_at", null)
       .order("item_name", { ascending: true });
 
+    // Fetch active checkouts to calculate checked out quantities
+    const { data: activeCheckouts } = await supabase
+      .from("itemsignouts")
+      .select("item_id, quantity")
+      .is("returned_date", null)
+      .is("deleted_at", null);
+
+    // Create a map of item_id -> total checked out quantity
+    const checkedOutMap = new Map<string, number>();
+    if (activeCheckouts) {
+      for (const checkout of activeCheckouts) {
+        const current = checkedOutMap.get(checkout.item_id) || 0;
+        checkedOutMap.set(checkout.item_id, current + checkout.quantity);
+      }
+    }
+
     if (!itemsError && itemsData) {
       // Transform the data to flatten tags
       items = itemsData.map((item: any) => ({
         id: item.id,
         item_name: item.item_name,
         quantity: item.quantity,
+        checked_out_quantity: checkedOutMap.get(item.id) || 0,
         notes: item.notes,
         image_URL: item.image_URL,
         created_by: item.created_by,
+        created_by_name: item.creator?.full_name || item.creator?.username || null,
         tags: (item.itemtags || [])
           .filter((it: any) => it.tags && !it.tags.deleted_at && !it.deleted_at)
           .map((it: any) => ({
@@ -169,9 +189,6 @@ type CheckoutItem = {
       checkoutsError.message?.includes("column") &&
       checkoutsError.message?.includes("teams")
     ) {
-      console.warn(
-        "⚠️ Teams column not found in profiles. Fetching checkouts without teams. Please run migration: migrations/add_teams_to_profiles.sql",
-      );
       const { data: dataWithoutTeams, error: errorWithoutTeams } =
         await supabase
           .from("itemsignouts")
@@ -258,7 +275,10 @@ type CheckoutItem = {
               No items found in inventory.
             </div>
           ) : (
-            <InventoryTable items={items} stickyControls maxHeight="600px" />
+            <InventoryTable
+              items={items}
+              userTeams={userTeams}
+            />
           )}
         </CardContent>
       </Card>

@@ -94,17 +94,10 @@ export async function deleteItem(id: ItemId) {
           p_image_url: itemData.image_URL
         });
         
-        if (deleteError) {
-          console.warn("RPC delete image failed:", deleteError);
-          // Continue with item deletion even if image deletion fails
-        } else if (deleteResult && !deleteResult[0]?.success) {
-          console.warn("Image deletion unsuccessful:", deleteResult[0]?.message);
-          // Continue with item deletion even if image deletion fails
-        } else {
-          console.log("Old image deleted successfully via RPC");
-        }
-      } catch (error) {
-        console.warn("Error calling delete image RPC:", error);
+        // Continue with item deletion even if image deletion fails
+        void deleteError;
+        void deleteResult;
+      } catch {
         // Continue with item deletion even if image deletion fails
       }
     }
@@ -126,10 +119,8 @@ export async function deleteItem(id: ItemId) {
       .eq("item_id", id)
       .is("deleted_at", null);
 
-    if (tagDeleteError) {
-      console.warn("Failed to delete item tags:", tagDeleteError);
-      // Don't fail the entire deletion if tags deletion fails
-    }
+    // Don't fail the entire deletion if tags deletion fails
+    void tagDeleteError;
 
     // Soft delete related itemsignouts
     const { error: signoutDeleteError } = await supabase
@@ -138,10 +129,8 @@ export async function deleteItem(id: ItemId) {
       .eq("item_id", id)
       .is("deleted_at", null);
 
-    if (signoutDeleteError) {
-      console.warn("Failed to delete item signouts:", signoutDeleteError);
-      // Don't fail the entire deletion if signouts deletion fails
-    }
+    // Don't fail the entire deletion if signouts deletion fails
+    void signoutDeleteError;
 
     return { id, deleted: true } as const;
   } catch (error) {

@@ -13,7 +13,13 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { ChevronDown, LayoutDashboard, Package, ShoppingCart } from "lucide-react";
+import {
+  ChevronDown,
+  LayoutDashboard,
+  Package,
+  ShoppingCart,
+  UserRound,
+} from "lucide-react";
 
 export default function Navbar() {
   const { user } = useUser();
@@ -70,7 +76,7 @@ export default function Navbar() {
   return (
     <header
       className={cn(
-        "sticky top-0 z-50 transition-all duration-500 ease-in-out overflow-hidden",
+        "sticky top-0 z-50 transition-all duration-500 ease-in-out overflow-visible",
         isScrolled
           ? "py-2"
           : "py-3 border-b border-border"
@@ -127,8 +133,20 @@ export default function Navbar() {
                 >
                   {fullName}
                 </span>
-                <div className="absolute right-0 top-full mt-1 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
-                  <div className="bg-popover border rounded-md shadow-md p-1">
+                <div className="absolute right-0 top-full mt-1 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-[60]">
+                  <div className="bg-popover border rounded-md shadow-md p-1 min-w-[180px]">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      asChild
+                      className="justify-start w-full"
+                    >
+                      <Link href="/profile">
+                        <UserRound className="mr-2 h-4 w-4" />
+                        Profile
+                      </Link>
+                    </Button>
+                    <div className="border-t border-border my-1" />
                     <LogoutButton />
                   </div>
                 </div>
@@ -150,7 +168,7 @@ export default function Navbar() {
                 </PopoverTrigger>
                 <PopoverContent 
                   align="end" 
-                  className="w-56 p-2"
+                  className="w-56 p-2 z-[60]"
                   sideOffset={8}
                 >
                   <div className="flex flex-col gap-1">
@@ -164,6 +182,18 @@ export default function Navbar() {
                       <Link href="/">
                         <LayoutDashboard className="mr-2 h-4 w-4" />
                         Dashboard
+                      </Link>
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      asChild
+                      className="justify-start w-full"
+                      onClick={() => setMobileMenuOpen(false)}
+                    >
+                      <Link href="/profile">
+                        <UserRound className="mr-2 h-4 w-4" />
+                        Profile
                       </Link>
                     </Button>
                     <Button

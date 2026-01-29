@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useRouter } from "next/navigation";
 import { Calendar, Package, User, CheckCircle2, Search, Filter, X, CheckCircle } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -66,6 +67,7 @@ const statusOptions: { value: StatusFilter; label: string }[] = [
 ];
 
 export function CheckoutTable({ checkouts, currentUserId, userTeams = [] }: CheckoutTableProps) {
+  const router = useRouter();
   const [viewMode, setViewMode] = React.useState<"yours" | "everyone" | "team">("yours");
   const [selectedTeam, setSelectedTeam] = React.useState<string | null>(null);
   const [statusFilter, setStatusFilter] = React.useState<StatusFilter>("all");
@@ -203,10 +205,11 @@ export function CheckoutTable({ checkouts, currentUserId, userTeams = [] }: Chec
     setCheckingIn(checkoutId);
     try {
       await checkInItem(checkoutId);
-      // Reload page to show updated data
-      window.location.reload();
+      // Refresh server data without full page reload
+      router.refresh();
     } catch (error) {
       alert(error instanceof Error ? error.message : "Failed to check in item");
+    } finally {
       setCheckingIn(null);
     }
   };
