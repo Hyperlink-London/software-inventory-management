@@ -24,7 +24,15 @@ type ItemWithTags = {
   }>;
 };
 
-export default async function Dashboard() {
+const CHECKOUT_PAGE_SIZE = 5;
+
+type CheckoutView = "yours" | "everyone" | "returned";
+
+type DashboardProps = {
+  searchParams: Promise<{ checkoutPage?: string; checkoutView?: string }>;
+};
+
+export default async function Dashboard({ searchParams }: DashboardProps) {
   const supabase = await createClient(cookies());
   const {
     data: { user },
@@ -68,6 +76,15 @@ export default async function Dashboard() {
       // Profile fetch failed
     }
   }
+
+  const resolved = await searchParams;
+  const checkoutPage = Math.max(1, parseInt(resolved.checkoutPage ?? "1", 10) || 1);
+  const checkoutFrom = (checkoutPage - 1) * CHECKOUT_PAGE_SIZE;
+  const checkoutTo = checkoutFrom + CHECKOUT_PAGE_SIZE - 1;
+  const checkoutView: CheckoutView =
+    resolved.checkoutView === "yours" || resolved.checkoutView === "everyone" || resolved.checkoutView === "returned"
+      ? resolved.checkoutView
+      : "yours";
 
   // Fetch items with their tags
   let items: ItemWithTags[] = [];
@@ -134,31 +151,63 @@ export default async function Dashboard() {
     }
   }
 
-  // Fetch checkouts
-type CheckoutItem = {
-  id: string;
-  item_id: string;
-  item_name: string;
-  image_URL: string | null;
-  quantity: number;
-  sign_out_date: string;
-  expected_return_date: string | null;
-  returned_date: string | null;
-  recipient_full_name: string;
-  recipient_id: string;
-  recipient_teams?: string[];
-};
+  // Fetch checkouts (paginated) filtered by view
+  type CheckoutItem = {
+    id: string;
+    item_id: string;
+    item_name: string;
+    image_URL: string | null;
+    quantity: number;
+    sign_out_date: string;
+    expected_return_date: string | null;
+    returned_date: string | null;
+    recipient_full_name: string;
+    recipient_id: string;
+    recipient_teams?: string[];
+  };
 
   let checkouts: CheckoutItem[] = [];
+  let checkoutTotalCount = 0;
+  let activeCount = 0;
+  let overdueCount = 0;
   if (user) {
-    // Try to fetch with teams first
+    const now = new Date().toISOString();
+    const { count: nonReturnedCount } = await supabase
+      .from("itemsignouts")
+      .select("id", { count: "exact", head: true })
+      .is("deleted_at", null)
+      .is("returned_date", null);
+    const { count: overdueCountRes } = await supabase
+      .from("itemsignouts")
+      .select("id", { count: "exact", head: true })
+      .is("deleted_at", null)
+      .is("returned_date", null)
+      .not("expected_return_date", "is", null)
+      .lt("expected_return_date", now);
+    activeCount = Math.max(0, (nonReturnedCount ?? 0) - (overdueCountRes ?? 0));
+    overdueCount = overdueCountRes ?? 0;
+
+    const applyCheckoutViewFilter = (q: any) => {
+      let query = q.is("deleted_at", null);
+      if (checkoutView === "yours" && userProfileId) {
+        query = query.eq("recipient_id", userProfileId).is("returned_date", null);
+      } else if (checkoutView === "everyone") {
+        query = query.is("returned_date", null);
+      } else if (checkoutView === "returned") {
+        query = query.not("returned_date", "is", null);
+      }
+      return query;
+    };
+
     let checkoutsData: any[] | null = null;
     let checkoutsError: any = null;
+    let count: number | null = null;
 
-    const { data, error } = await supabase
-      .from("itemsignouts")
-      .select(
-        `
+    let q1 = applyCheckoutViewFilter(
+      supabase
+        .from("itemsignouts")
+        .select(
+          `
         id,
         item_id,
         quantity,
@@ -176,21 +225,18 @@ type CheckoutItem = {
           teams
         )
       `,
-      )
-      .is("deleted_at", null)
-      .order("sign_out_date", { ascending: false });
+          { count: "exact" },
+        )
+    ).order(checkoutView === "returned" ? "returned_date" : "sign_out_date", { ascending: checkoutView === "returned" });
+    if (checkoutView === "returned") q1 = q1.order("sign_out_date", { ascending: true });
+    const res1 = await q1.range(checkoutFrom, checkoutTo);
+    checkoutsData = res1.data;
+    checkoutsError = res1.error;
+    count = res1.count ?? null;
 
-    checkoutsData = data;
-    checkoutsError = error;
-
-    // If error is about teams column, try without it
-    if (
-      checkoutsError &&
-      checkoutsError.message?.includes("column") &&
-      checkoutsError.message?.includes("teams")
-    ) {
-      const { data: dataWithoutTeams, error: errorWithoutTeams } =
-        await supabase
+    if (checkoutsError?.message?.includes("column") && checkoutsError?.message?.includes("teams")) {
+      let q2 = applyCheckoutViewFilter(
+        supabase
           .from("itemsignouts")
           .select(
             `
@@ -210,15 +256,18 @@ type CheckoutItem = {
             username
           )
         `,
+            { count: "exact" },
           )
-          .is("deleted_at", null)
-          .order("sign_out_date", { ascending: false });
-
-      checkoutsData = dataWithoutTeams;
-      checkoutsError = errorWithoutTeams;
+      ).order(checkoutView === "returned" ? "returned_date" : "sign_out_date", { ascending: checkoutView === "returned" });
+      if (checkoutView === "returned") q2 = q2.order("sign_out_date", { ascending: true });
+      const res2 = await q2.range(checkoutFrom, checkoutTo);
+      checkoutsData = res2.data;
+      checkoutsError = res2.error;
+      count = res2.count ?? null;
     }
 
     if (!checkoutsError && checkoutsData) {
+      checkoutTotalCount = count ?? 0;
       checkouts = checkoutsData.map((checkout: any) => ({
         id: checkout.id,
         item_id: checkout.item_id,
@@ -246,6 +295,16 @@ type CheckoutItem = {
         checkouts={checkouts}
         currentUserId={userProfileId}
         userTeams={userTeams}
+        totalCount={checkoutTotalCount}
+        currentPage={checkoutPage}
+        pageSize={CHECKOUT_PAGE_SIZE}
+        basePath="/"
+        pageParam="checkoutPage"
+        initialViewMode={checkoutView}
+        viewParam="checkoutView"
+        returnViewSearchParams="checkoutView=returned"
+        activeCount={activeCount}
+        overdueCount={overdueCount}
       />
 
       <Card className="w-full">

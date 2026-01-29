@@ -5,6 +5,7 @@ import { ChevronDown, ChevronUp, ExternalLink } from "lucide-react";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { CheckoutTable } from "@/components/CheckoutTable";
 import { cn } from "@/lib/utils";
 
@@ -25,19 +26,35 @@ type CollapsibleCheckoutCardProps = {
   checkouts: CheckoutItem[];
   currentUserId: string | null;
   userTeams?: string[];
+  totalCount?: number;
+  currentPage?: number;
+  pageSize?: number;
+  basePath?: string;
+  pageParam?: string;
+  initialViewMode?: "yours" | "everyone" | "team" | "returned";
+  viewParam?: string;
+  returnViewSearchParams?: string;
+  activeCount?: number;
+  overdueCount?: number;
 };
 
 export function CollapsibleCheckoutCard({
   checkouts,
   currentUserId,
   userTeams = [],
+  totalCount,
+  currentPage = 1,
+  pageSize = 10,
+  basePath,
+  pageParam = "page",
+  initialViewMode,
+  viewParam,
+  returnViewSearchParams,
+  activeCount = 0,
+  overdueCount = 0,
 }: CollapsibleCheckoutCardProps) {
   const [isOpen, setIsOpen] = React.useState(true);
-
-  // Count active checkouts for badge
-  const activeCheckoutsCount = React.useMemo(() => {
-    return checkouts.filter((c) => !c.returned_date).length;
-  }, [checkouts]);
+  const showBadge = activeCount > 0 || overdueCount > 0;
 
   return (
     <Card>
@@ -45,9 +62,14 @@ export function CollapsibleCheckoutCard({
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-2 text-lg">
             Checkouts
-            {activeCheckoutsCount > 0 && (
-              <span className="ml-2 rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
-                {activeCheckoutsCount} active
+            {showBadge && (
+              <span className="ml-2 inline-flex flex-wrap items-center gap-2">
+                <Badge className="bg-green-500/20 text-green-500 border-green-500/30">
+                  {activeCount} Active
+                </Badge>
+                <Badge className="bg-red-500/20 text-red-500 border-red-500/30">
+                  {overdueCount} Overdue
+                </Badge>
               </span>
             )}
           </CardTitle>
@@ -100,7 +122,15 @@ export function CollapsibleCheckoutCard({
               : "-translate-y-2 opacity-0"
           )}
         >
-          <CheckoutTable checkouts={checkouts} currentUserId={currentUserId} userTeams={userTeams} />
+          <CheckoutTable
+            checkouts={checkouts}
+            currentUserId={currentUserId}
+            userTeams={userTeams}
+            {...(totalCount != null && basePath != null ? { totalCount, currentPage, pageSize, basePath, pageParam } : {})}
+            {...(initialViewMode != null ? { initialViewMode } : {})}
+            {...(viewParam != null ? { viewParam } : {})}
+            {...(returnViewSearchParams != null ? { returnViewSearchParams } : {})}
+          />
         </CardContent>
       </div>
     </Card>

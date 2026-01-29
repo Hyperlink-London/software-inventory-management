@@ -18,8 +18,6 @@ import { EditItemDialog } from "@/components/EditItemDialog";
 import { checkoutItem } from "@/actions/checkout/action";
 import { CollapsibleCheckoutCard } from "@/components/CollapsibleCheckoutCard";
 
-import { isAdmin, getProfileID } from "@/contexts/UserContext";
-
 type ItemWithTags = {
   id: string;
   item_name: string;
@@ -66,30 +64,6 @@ export function ItemDetail({
   const [checkoutDialogOpen, setCheckoutDialogOpen] = React.useState(false);
   const [editDialogOpen, setEditDialogOpen] = React.useState(false);
   const [imageLoading, setImageLoading] = React.useState(true);
-
-  // get Permissions
-  const [isUserAdmin, setIsUserAdmin] = React.useState(
-    userTeams.includes("admin"),
-  );
-  const [profileID, setProfileID] = React.useState<string>("");
-
-  React.useEffect(() => {
-    async function checkPermissions() {
-      if (userTeams.includes("admin")) {
-        setIsUserAdmin(true);
-      } else {
-        try {
-          const resultA = await isAdmin();
-          setIsUserAdmin(!!resultA); // guarantees boolean
-        } catch {
-          setIsUserAdmin(false);
-        }
-      }
-      const resultID = await getProfileID();
-      setProfileID(resultID ?? "");
-    }
-    checkPermissions();
-  }, [userTeams]);
 
   const getStatusIcon = (quantity: number) => {
     if (quantity === 0) {
@@ -168,16 +142,14 @@ export function ItemDetail({
         </div>
 
         <div className="flex gap-2 flex-wrap">
-          {(isUserAdmin || profileID == item.created_by) && (
-            <Button
-              variant="outline"
-              onClick={() => setEditDialogOpen(true)}
-              className="h-9"
-            >
-              <Pencil className="mr-2 h-4 w-4" />
-              Edit
-            </Button>
-          )}
+          <Button
+            variant="outline"
+            onClick={() => setEditDialogOpen(true)}
+            className="h-9"
+          >
+            <Pencil className="mr-2 h-4 w-4" />
+            Edit
+          </Button>
           <Button
             variant="outline"
             onClick={() => setCheckoutDialogOpen(true)}

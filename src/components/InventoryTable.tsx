@@ -50,8 +50,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 
-import { isAdmin, getProfileID } from "@/contexts/UserContext";
-
 type ItemWithTags = {
   id: string;
   item_name: string;
@@ -180,30 +178,6 @@ export function InventoryTable({
   const [selectedImageItem, setSelectedImageItem] =
     React.useState<ItemWithTags | null>(null);
   const [currentPage, setCurrentPage] = React.useState(1);
-
-  // get Permissions
-  const [isUserAdmin, setIsUserAdmin] = React.useState(
-    userTeams.includes("admin"),
-  );
-  const [profileID, setProfileID] = React.useState<string>("");
-
-  React.useEffect(() => {
-    async function checkPermissions() {
-      if (userTeams.includes("admin")) {
-        setIsUserAdmin(true);
-      } else {
-        try {
-          const resultA = await isAdmin();
-          setIsUserAdmin(!!resultA); // guarantees boolean
-        } catch {
-          setIsUserAdmin(false);
-        }
-      }
-      const resultID = await getProfileID();
-      setProfileID(resultID ?? "");
-    }
-    checkPermissions();
-  }, [userTeams]);
 
   // Sync local items with props when they change
   React.useEffect(() => {
@@ -571,19 +545,17 @@ export function InventoryTable({
           )}
 
           <div className="flex gap-2 pt-2">
-            {(isUserAdmin || profileID == item.created_by) && (
-              <Button
-                variant="outline"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleEditClick(item);
-                }}
-                className="flex-1 h-11 text-sm"
-              >
-                <Pencil className="mr-2 h-4 w-4" />
-                Edit
-              </Button>
-            )}
+            <Button
+              variant="outline"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleEditClick(item);
+              }}
+              className="flex-1 h-11 text-sm"
+            >
+              <Pencil className="mr-2 h-4 w-4" />
+              Edit
+            </Button>
             <Button
               variant="outline"
               onClick={(e) => {
@@ -711,20 +683,18 @@ export function InventoryTable({
                     </TableCell>
                     <TableCell className="min-w-0">
                       <div className="flex flex-col gap-2">
-                        {(isUserAdmin || profileID == item.created_by) && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleEditClick(item);
-                            }}
-                            className="w-full"
-                          >
-                            <Pencil className="mr-2 h-4 w-4" />
-                            Edit
-                          </Button>
-                        )}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleEditClick(item);
+                          }}
+                          className="w-full"
+                        >
+                          <Pencil className="mr-2 h-4 w-4" />
+                          Edit
+                        </Button>
                         <Button
                           variant="outline"
                           size="sm"
