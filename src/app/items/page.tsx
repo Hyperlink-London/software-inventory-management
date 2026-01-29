@@ -10,9 +10,11 @@ type ItemWithTags = {
   id: string;
   item_name: string;
   quantity: number;
+  checked_out_quantity: number;
   notes: string | null;
   image_URL: string | null;
   created_by: string | null;
+  created_by_name: string | null;
   tags: Array<{
     id: string;
     name: string;
@@ -31,12 +33,33 @@ export default async function ItemsPage({ searchParams }: ItemsPageProps) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const resolved = await searchParams;
-  const page = Math.max(1, parseInt(resolved.page ?? "1", 10) || 1);
-  const from = (page - 1) * PAGE_SIZE;
-  const to = from + PAGE_SIZE - 1;
+  // Fetch user teams for admin permissions
+  let userTeams: string[] = [];
+  if (user?.id) {
+    try {
+      const { data: profile, error: profileError } = await supabase
+        .from("profiles")
+        .select("teams")
+        .eq("supabase_uid", user.id)
+        .is("deleted_at", null)
+        .single();
 
-  // Fetch items with their tags (paginated) and total count
+      if (profileError) {
+        if (
+          profileError.message?.includes("column") &&
+          profileError.message?.includes("teams")
+        ) {
+          userTeams = [];
+        }
+      } else {
+        userTeams = (profile?.teams as string[]) || [];
+      }
+    } catch {
+      // Profile teams fetch failed
+    }
+  }
+
+  // Fetch items with their tags
   let items: ItemWithTags[] = [];
   let totalCount = 0;
   if (user) {
@@ -50,6 +73,10 @@ export default async function ItemsPage({ searchParams }: ItemsPageProps) {
         notes,
         image_URL,
         created_by,
+        creator:profiles!items_created_by_fkey(
+          full_name,
+          username
+        ),
         itemtags(
           tags(
             id,
@@ -63,15 +90,33 @@ export default async function ItemsPage({ searchParams }: ItemsPageProps) {
       .order("item_name", { ascending: true })
       .range(from, to);
 
+    // Fetch active checkouts to calculate checked out quantities
+    const { data: activeCheckouts } = await supabase
+      .from("itemsignouts")
+      .select("item_id, quantity")
+      .is("returned_date", null)
+      .is("deleted_at", null);
+
+    // Create a map of item_id -> total checked out quantity
+    const checkedOutMap = new Map<string, number>();
+    if (activeCheckouts) {
+      for (const checkout of activeCheckouts) {
+        const current = checkedOutMap.get(checkout.item_id) || 0;
+        checkedOutMap.set(checkout.item_id, current + checkout.quantity);
+      }
+    }
+
     if (!itemsError && itemsData) {
       totalCount = count ?? 0;
       items = itemsData.map((item: any) => ({
         id: item.id,
         item_name: item.item_name,
         quantity: item.quantity,
+        checked_out_quantity: checkedOutMap.get(item.id) || 0,
         notes: item.notes,
         image_URL: item.image_URL,
         created_by: item.created_by,
+        created_by_name: item.creator?.full_name || item.creator?.username || null,
         tags: (item.itemtags || [])
           .filter((it: any) => it.tags && !it.tags.deleted_at && !it.deleted_at)
           .map((it: any) => ({
@@ -110,13 +155,7 @@ export default async function ItemsPage({ searchParams }: ItemsPageProps) {
               No items found in inventory.
             </div>
           ) : (
-            <InventoryTable
-              items={items}
-              totalCount={totalCount}
-              currentPage={page}
-              pageSize={PAGE_SIZE}
-              basePath="/items"
-            />
+            <InventoryTable items={items} userTeams={userTeams} />
           )}
         </CardContent>
       </Card>

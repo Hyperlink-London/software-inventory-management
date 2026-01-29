@@ -9,6 +9,7 @@ import {
   XCircle,
   ShoppingCart,
   Pencil,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -21,9 +22,11 @@ type ItemWithTags = {
   id: string;
   item_name: string;
   quantity: number;
+  checked_out_quantity: number;
   notes: string | null;
   image_URL: string | null;
   created_by: string | null;
+  created_by_name: string | null;
   tags: Array<{
     id: string;
     name: string;
@@ -60,6 +63,7 @@ export function ItemDetail({
   const [currentItem, setCurrentItem] = React.useState<ItemWithTags>(item);
   const [checkoutDialogOpen, setCheckoutDialogOpen] = React.useState(false);
   const [editDialogOpen, setEditDialogOpen] = React.useState(false);
+  const [imageLoading, setImageLoading] = React.useState(true);
 
   const getStatusIcon = (quantity: number) => {
     if (quantity === 0) {
@@ -107,8 +111,8 @@ export function ItemDetail({
     expected_return_date: string;
   }) => {
     await checkoutItem(data);
-    // The page will be revalidated by the server action
-    window.location.reload();
+    // Refresh server data without full page reload
+    router.refresh();
   };
 
   return (
@@ -163,11 +167,20 @@ export function ItemDetail({
         {/* Image section */}
         <div className="rounded-lg border p-4 flex items-center justify-center bg-muted/40">
           {currentItem.image_URL ? (
-            <img
-              src={currentItem.image_URL}
-              alt={currentItem.item_name}
-              className="max-h-[350px] w-auto rounded-md object-contain"
-            />
+            <div className="relative w-full min-h-[200px] flex items-center justify-center">
+              {imageLoading && (
+                <div className="absolute inset-0 flex items-center justify-center bg-muted rounded-md">
+                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                </div>
+              )}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={currentItem.image_URL}
+                alt={currentItem.item_name}
+                className="max-h-[350px] max-w-full rounded-md object-contain"
+                onLoad={() => setImageLoading(false)}
+              />
+            </div>
           ) : (
             <div className="flex h-64 w-full items-center justify-center rounded-md border border-dashed border-border bg-muted text-muted-foreground">
               <span className="text-sm">No image available</span>
@@ -196,7 +209,7 @@ export function ItemDetail({
             </div>
             <div className="flex items-center justify-between">
               <span className="text-sm font-medium text-muted-foreground">
-                Quantity
+                Quantity (available/total)
               </span>
               <span
                 className={
@@ -207,7 +220,7 @@ export function ItemDetail({
                       : "font-semibold"
                 }
               >
-                {currentItem.quantity}
+                {currentItem.quantity} / {currentItem.quantity + currentItem.checked_out_quantity}
               </span>
             </div>
           </div>
@@ -250,6 +263,16 @@ export function ItemDetail({
                 No additional notes for this item.
               </p>
             )}
+          </div>
+
+          {/* Logged by */}
+          <div className="rounded-lg border p-4 space-y-2">
+            <span className="text-sm font-medium text-muted-foreground">
+              Logged by
+            </span>
+            <p className="text-sm">
+              {currentItem.created_by_name || "Unknown"}
+            </p>
           </div>
         </div>
       </div>

@@ -18,8 +18,11 @@ type ItemWithTags = {
   id: string;
   item_name: string;
   quantity: number;
+  checked_out_quantity?: number;
   notes: string | null;
   image_URL: string | null;
+  created_by?: string | null;
+  created_by_name?: string | null;
   tags: Array<{
     id: string;
     name: string;

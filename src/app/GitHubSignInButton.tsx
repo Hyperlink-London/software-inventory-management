@@ -13,8 +13,6 @@ export default function GitHubSignInButton() {
     const origin = typeof window !== "undefined" ? window.location.origin : "";
     const callbackUrl = `${origin}/auth/callback?redirect_to=${encodeURIComponent(redirectTo)}`;
     
-    console.log("Starting GitHub OAuth...", { origin, callbackUrl });
-    
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: "github",
       options: {
@@ -28,11 +26,9 @@ export default function GitHubSignInButton() {
     });
 
     if (error) {
-      console.error("Login error:", error);
       alert(error.message);
-    } else {
-      console.log("OAuth initiated successfully");
     }
+    void data;
   }
 
   return (

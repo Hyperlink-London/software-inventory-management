@@ -29,7 +29,6 @@ const fetchAllTags = async (): Promise<TagOption[]> => {
   const { data, error } = await supabase.from("tags").select("id, name");
 
   if (error) {
-    console.error("Error fetching tags:", error);
     throw error;
   }
   return data as TagOption[];
@@ -39,9 +38,11 @@ type ItemWithTags = {
   id: string;
   item_name: string;
   quantity: number;
+  checked_out_quantity: number;
   notes: string | null;
   image_URL: string | null;
   created_by: string | null;
+  created_by_name: string | null;
   tags: Array<{
     id: string;
     name: string;
@@ -107,8 +108,8 @@ export function EditItemDialog({
           setIsLoadingTags(true);
           const data = await fetchAllTags();
           setAvailableTags(data);
-        } catch (error) {
-          console.error("Failed to load available tags:", error);
+        } catch {
+          // Failed to load tags
         } finally {
           setIsLoadingTags(false);
         }
@@ -206,16 +207,10 @@ export function EditItemDialog({
               p_image_url: formData.existingImageUrl
             });
             
-            if (deleteError) {
-              console.warn("RPC delete image failed:", deleteError);
-            } else if (deleteResult && !deleteResult[0]?.success) {
-              console.warn("Image deletion unsuccessful:", deleteResult[0]?.message);
-            } else {
-              console.log("Old image deleted successfully");
-            }
             // Continue with upload regardless of delete result
-          } catch (error) {
-            console.warn("Error calling delete image RPC:", error);
+            void deleteError;
+            void deleteResult;
+          } catch {
             // Continue with upload even if delete fails
           }
         }
@@ -228,7 +223,6 @@ export function EditItemDialog({
           .upload(fileName, formData.image);
 
         if (uploadError) {
-          console.error("Image upload failed:", uploadError);
           toast.error("Failed to upload image");
           return;
         }
@@ -251,20 +245,11 @@ export function EditItemDialog({
         p_verify_ownership: false, // Set to true if you want to restrict updates to creator only
       };
       
-      console.log("Calling update_item RPC with params:", rpcParams);
-      
       const { data: updatedItemData, error: itemError } = await supabase.rpc("update_item", rpcParams);
 
       if (itemError) {
-        console.error("Update failed - Full error object:", itemError);
-        console.error("Error message:", itemError.message);
-        console.error("Error details:", itemError.details);
-        console.error("Error hint:", itemError.hint);
-        console.error("Error code:", itemError.code);
-        
         // Empty error object usually means function doesn't exist or permission issue
         if (Object.keys(itemError).length === 0) {
-          console.error("Empty error object - RPC function may not exist or user lacks permissions");
           toast.error("Failed to update item: RPC function error. Please check if 'update_item' function exists in Supabase.");
         } else {
           const errorMessage = itemError.message || itemError.details || itemError.hint || "Unknown error occurred";
@@ -273,7 +258,7 @@ export function EditItemDialog({
         return;
       }
       
-      console.log("Update successful, data:", updatedItemData);
+      void updatedItemData;
 
       // Delete existing item tags
       await supabase.from("itemtags").delete().eq("item_id", item.id);
@@ -295,8 +280,7 @@ export function EditItemDialog({
               if (newTag && newTag.id) {
                 tagIdsToLink.push(newTag.id);
               }
-            } catch (err) {
-              console.error("Failed to create new tag:", err);
+            } catch {
               // Try to find if tag was created by another process
               const { data: foundTag } = await supabase
                 .from("tags")
@@ -306,8 +290,6 @@ export function EditItemDialog({
 
               if (foundTag) {
                 tagIdsToLink.push(foundTag.id);
-              } else {
-                console.error("Could not create or find tag:", tagIdOrName);
               }
             }
           }
@@ -325,7 +307,6 @@ export function EditItemDialog({
             );
 
           if (itemTagError) {
-            console.error("Inserting item tags failed:", itemTagError);
             toast.warning("Item updated but failed to update tags");
           }
         }
@@ -342,6 +323,10 @@ export function EditItemDialog({
           notes,
           image_URL,
           created_by,
+          creator:profiles!items_created_by_fkey(
+            full_name,
+            username
+          ),
           itemtags(
             tags(
               id,
@@ -353,15 +338,27 @@ export function EditItemDialog({
         .eq("id", item.id)
         .single();
 
+      // Fetch active checkouts to calculate checked out quantity
+      const { data: activeCheckouts } = await supabase
+        .from("itemsignouts")
+        .select("quantity")
+        .eq("item_id", item.id)
+        .is("returned_date", null)
+        .is("deleted_at", null);
+
+      const checkedOutQuantity = activeCheckouts?.reduce((sum, checkout) => sum + checkout.quantity, 0) || 0;
+
       let updatedItem: ItemWithTags | undefined;
       if (itemWithTagsData) {
         updatedItem = {
           id: itemWithTagsData.id,
           item_name: itemWithTagsData.item_name,
           quantity: itemWithTagsData.quantity,
+          checked_out_quantity: checkedOutQuantity,
           notes: itemWithTagsData.notes,
           image_URL: itemWithTagsData.image_URL,
           created_by: itemWithTagsData.created_by,
+          created_by_name: (itemWithTagsData as any).creator?.full_name || (itemWithTagsData as any).creator?.username || null,
           tags: (itemWithTagsData.itemtags || [])
             .filter(
               (it: any) => it.tags && !it.tags.deleted_at && !it.deleted_at,
@@ -379,8 +376,7 @@ export function EditItemDialog({
       if (onSuccess) {
         onSuccess(updatedItem);
       }
-    } catch (error) {
-      console.error("Error updating item:", error);
+    } catch {
       toast.error("An error occurred while updating the item");
     } finally {
       setIsSubmitting(false);
@@ -409,7 +405,6 @@ export function EditItemDialog({
         onSuccess(undefined, item.id);
       }
     } catch (error) {
-      console.error("Error deleting item:", error);
       toast.error(`Failed to delete item: ${error instanceof Error ? error.message : "Unknown error"}`);
     } finally {
       setIsDeleting(false);

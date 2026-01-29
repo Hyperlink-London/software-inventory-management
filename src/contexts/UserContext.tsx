@@ -55,8 +55,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       setSession(session);
       setUser(finalUser);
       setLoading(false);
-    } catch (error) {
-      console.error("Error refreshing session:", error);
+    } catch {
       setSession(null);
       setUser(null);
       setLoading(false);
@@ -139,8 +138,6 @@ export async function getProfileID() {
     .single();
 
   if (error) {
-    console.log("authID: ", user.id);
-    console.error("Failed to fetch profile ID:", error);
     return null;
   }
 
@@ -168,8 +165,6 @@ export async function getUserTeams() {
     .single();
 
   if (error) {
-    console.log("authID: ", user.id);
-    console.error("Failed to fetch profile permissions:", error);
     return null;
   }
 

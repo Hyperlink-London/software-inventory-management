@@ -10,9 +10,11 @@ type ItemWithTags = {
   id: string;
   item_name: string;
   quantity: number;
+  checked_out_quantity: number;
   notes: string | null;
   image_URL: string | null;
   created_by: string | null;
+  created_by_name: string | null;
   tags: Array<{
     id: string;
     name: string;
@@ -55,7 +57,6 @@ export default async function ItemDetailPage({ params }: ItemDetailPageProps) {
         .single();
 
       if (profileError) {
-        console.error("Error fetching profile:", profileError);
         // If teams column doesn't exist, try without it
         if (
           profileError.message?.includes("column") &&
@@ -69,20 +70,17 @@ export default async function ItemDetailPage({ params }: ItemDetailPageProps) {
             .single();
           userProfileId = profileWithoutTeams?.id || null;
           userTeams = [];
-          console.warn(
-            "⚠️ Teams column not found. Please run migration: migrations/add_teams_to_profiles.sql",
-          );
         }
       } else {
         userProfileId = (profile?.id as string) || null;
         userTeams = (profile?.teams as string[]) || [];
       }
-    } catch (error) {
-      console.error("Error in profile fetch:", error);
+    } catch {
+      // Profile fetch failed
     }
   }
 
-  // Fetch item details
+  // Fetch item details with creator profile
   const { data, error } = await supabase
     .from("items")
     .select(
@@ -93,6 +91,10 @@ export default async function ItemDetailPage({ params }: ItemDetailPageProps) {
         notes,
         image_URL,
         created_by,
+        creator:profiles!items_created_by_fkey(
+          full_name,
+          username
+        ),
         itemtags(
           tags(
             id,
@@ -118,13 +120,25 @@ export default async function ItemDetailPage({ params }: ItemDetailPageProps) {
     );
   }
 
+  // Fetch active checkouts to calculate checked out quantity for this item
+  const { data: activeCheckouts } = await supabase
+    .from("itemsignouts")
+    .select("quantity")
+    .eq("item_id", id)
+    .is("returned_date", null)
+    .is("deleted_at", null);
+
+  const checkedOutQuantity = activeCheckouts?.reduce((sum, checkout) => sum + checkout.quantity, 0) || 0;
+
   const item: ItemWithTags = {
     id: data.id,
     item_name: data.item_name,
     quantity: data.quantity,
+    checked_out_quantity: checkedOutQuantity,
     notes: data.notes,
     image_URL: data.image_URL,
     created_by: data.created_by,
+    created_by_name: (data as any).creator?.full_name || (data as any).creator?.username || null,
     tags: (data.itemtags || [])
       .filter((it: any) => it.tags && !it.tags.deleted_at && !it.deleted_at)
       .map((it: any) => ({
@@ -175,9 +189,6 @@ export default async function ItemDetailPage({ params }: ItemDetailPageProps) {
       checkoutsError.message?.includes("column") &&
       checkoutsError.message?.includes("teams")
     ) {
-      console.warn(
-        "⚠️ Teams column not found in profiles. Fetching checkouts without teams. Please run migration: migrations/add_teams_to_profiles.sql",
-      );
       const {
         data: checkoutDataWithoutTeams,
         error: checkoutErrorWithoutTeams,
