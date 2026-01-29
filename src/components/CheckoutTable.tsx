@@ -1,7 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { Calendar, Package, User, CheckCircle2, Search, Filter, X, CheckCircle } from "lucide-react";
+import Link from "next/link";
+import { Calendar, Package, User, CheckCircle2, Search, Filter, X, CheckCircle, ChevronLeft, ChevronRight } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -26,6 +27,7 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
+import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { checkInItem } from "@/actions/checkin/action";
 
@@ -47,9 +49,22 @@ type CheckoutTableProps = {
   checkouts: CheckoutItem[];
   currentUserId: string | null;
   userTeams?: string[];
+  /** When set, shows server-side pagination. */
+  totalCount?: number;
+  currentPage?: number;
+  pageSize?: number;
+  basePath?: string;
+  /** Query param name for page (default "page"). Use "checkoutPage" on dashboard to avoid clashing with inventory page. */
+  pageParam?: string;
+  /** When view is server-driven (e.g. ?view=yours). Pagination count and data match this view. */
+  initialViewMode?: "yours" | "everyone" | "team" | "returned";
+  /** Query param name for view (e.g. "view"). Used when navigating and in pagination links. */
+  viewParam?: string;
+  /** Query string for Returned view (e.g. "view=returned"). Used when clicking Returned. */
+  returnViewSearchParams?: string;
 };
 
-type StatusFilter = "all" | "active" | "overdue" | "returned";
+type StatusFilter = "all" | "active" | "overdue";
 
 // Helper function to check if checkout is overdue
 const isOverdue = (expectedReturn: string | null, returned: string | null) => {
@@ -62,11 +77,26 @@ const statusOptions: { value: StatusFilter; label: string }[] = [
   { value: "all", label: "All" },
   { value: "active", label: "Active" },
   { value: "overdue", label: "Overdue" },
-  { value: "returned", label: "Returned" },
 ];
 
-export function CheckoutTable({ checkouts, currentUserId, userTeams = [] }: CheckoutTableProps) {
-  const [viewMode, setViewMode] = React.useState<"yours" | "everyone" | "team">("yours");
+export function CheckoutTable({
+  checkouts,
+  currentUserId,
+  userTeams = [],
+  totalCount,
+  currentPage = 1,
+  pageSize = 10,
+  basePath,
+  pageParam = "page",
+  initialViewMode,
+  viewParam,
+  returnViewSearchParams,
+}: CheckoutTableProps) {
+  const router = useRouter();
+  const isPaginated = totalCount != null && basePath != null;
+  const [viewMode, setViewMode] = React.useState<"yours" | "everyone" | "team" | "returned">(
+    initialViewMode ?? "yours"
+  );
   const [selectedTeam, setSelectedTeam] = React.useState<string | null>(null);
   const [statusFilter, setStatusFilter] = React.useState<StatusFilter>("all");
   const [searchQuery, setSearchQuery] = React.useState("");
@@ -74,6 +104,13 @@ export function CheckoutTable({ checkouts, currentUserId, userTeams = [] }: Chec
   const [teamFilterOpen, setTeamFilterOpen] = React.useState(false);
   const [checkingIn, setCheckingIn] = React.useState<string | null>(null);
   const [mounted, setMounted] = React.useState(false);
+
+  // Sync view mode when URL-driven (e.g. navigating to ?status=returned)
+  React.useEffect(() => {
+    if (initialViewMode != null) {
+      setViewMode(initialViewMode);
+    }
+  }, [initialViewMode]);
 
   // Only render Popover after mount to avoid hydration mismatch
   React.useEffect(() => {
@@ -84,10 +121,16 @@ export function CheckoutTable({ checkouts, currentUserId, userTeams = [] }: Chec
     // First filter by view mode (yours vs everyone vs team)
     let filtered = checkouts;
     if (viewMode === "yours" && currentUserId) {
-      filtered = checkouts.filter((checkout) => checkout.recipient_id === currentUserId);
+      // Your checkouts: only active (not yet returned) — returned items show only in the Returned tab
+      filtered = checkouts.filter(
+        (checkout) => checkout.recipient_id === currentUserId && !checkout.returned_date
+      );
     } else if (viewMode === "everyone") {
-      // Show all checkouts
-      filtered = checkouts;
+      // Everyone checkouts: only active (not yet returned)
+      filtered = checkouts.filter((checkout) => !checkout.returned_date);
+    } else if (viewMode === "returned") {
+      // Show all returned items (yours and others)
+      filtered = checkouts.filter((checkout) => !!checkout.returned_date);
     } else if (viewMode === "team") {
       // Team checkouts - show checkouts from users in the selected team
       if (userTeams.length > 0) {
@@ -104,6 +147,7 @@ export function CheckoutTable({ checkouts, currentUserId, userTeams = [] }: Chec
           : normalizedUserTeams;
         
         filtered = checkouts.filter((checkout) => {
+          if (checkout.returned_date) return false; // Team checkouts: only active (not returned)
           const recipientTeams = checkout.recipient_teams || [];
           
           // Normalize recipient teams (handle arrays, nulls, ensure strings)
@@ -139,13 +183,12 @@ export function CheckoutTable({ checkouts, currentUserId, userTeams = [] }: Chec
       });
     }
 
-    // Then filter by status
-    if (statusFilter !== "all") {
+    // Then filter by status (only when not in "returned" view mode)
+    if (statusFilter !== "all" && viewMode !== "returned") {
       filtered = filtered.filter((checkout) => {
         const returned = !!checkout.returned_date;
         const overdue = isOverdue(checkout.expected_return_date, checkout.returned_date);
 
-        if (statusFilter === "returned") return returned;
         if (statusFilter === "overdue") return overdue;
         if (statusFilter === "active") return !returned && !overdue;
         return true;
@@ -167,17 +210,6 @@ export function CheckoutTable({ checkouts, currentUserId, userTeams = [] }: Chec
       return new Date(bDate).getTime() - new Date(aDate).getTime();
     });
   }, [checkouts, viewMode, currentUserId, statusFilter, searchQuery, userTeams, selectedTeam]);
-
-  // Separate active and returned checkouts
-  const activeCheckouts = React.useMemo(
-    () => filteredAndSortedCheckouts.filter((c) => !c.returned_date),
-    [filteredAndSortedCheckouts]
-  );
-
-  const returnedCheckouts = React.useMemo(
-    () => filteredAndSortedCheckouts.filter((c) => !!c.returned_date),
-    [filteredAndSortedCheckouts]
-  );
 
   const formatDate = (dateString: string | null) => {
     if (!dateString) return "—";
@@ -203,10 +235,11 @@ export function CheckoutTable({ checkouts, currentUserId, userTeams = [] }: Chec
     setCheckingIn(checkoutId);
     try {
       await checkInItem(checkoutId);
-      // Reload page to show updated data
-      window.location.reload();
+      // Refresh server data so the item disappears from active list and appears in Returned
+      router.refresh();
     } catch (error) {
       alert(error instanceof Error ? error.message : "Failed to check in item");
+    } finally {
       setCheckingIn(null);
     }
   };
@@ -230,20 +263,56 @@ export function CheckoutTable({ checkouts, currentUserId, userTeams = [] }: Chec
     return statusOptions.find((opt) => opt.value === status)?.label || "All";
   };
 
+  const pathBase = basePath === "/" ? "/" : basePath ?? "";
+  const buildPageUrl = (pageNum: number, viewValue?: string) => {
+    if (!basePath) return "";
+    const params = new URLSearchParams();
+    if (viewParam && (viewValue ?? initialViewMode)) {
+      params.set(viewParam, viewValue ?? initialViewMode ?? "everyone");
+    }
+    params.set(pageParam, String(pageNum));
+    return `${pathBase}?${params.toString()}`;
+  };
+  const returnedViewUrl =
+    basePath && returnViewSearchParams
+      ? `${pathBase}?${returnViewSearchParams}&${pageParam}=1`
+      : null;
+
+  const goToActiveView = (viewValue: "yours" | "everyone" | "team") => {
+    // Team is client-side only (server doesn't support view=team), so don't navigate when selecting team
+    if (viewValue === "team") return;
+    if (isPaginated && basePath && viewParam) {
+      router.push(buildPageUrl(1, viewValue));
+    }
+  };
+  const goToReturnedView = () => {
+    if (returnedViewUrl) {
+      router.push(returnedViewUrl);
+    } else {
+      setViewMode("returned");
+    }
+  };
+
   return (
     <div className="space-y-3">
       {/* View Mode Toggle */}
       <div className="flex flex-wrap gap-2">
         <Button
           variant={viewMode === "yours" ? "default" : "outline"}
-          onClick={() => setViewMode("yours")}
+          onClick={() => {
+            goToActiveView("yours");
+            setViewMode("yours");
+          }}
           className="flex-1 sm:flex-initial"
         >
           Your Checkouts
         </Button>
         <Button
           variant={viewMode === "everyone" ? "default" : "outline"}
-          onClick={() => setViewMode("everyone")}
+          onClick={() => {
+            goToActiveView("everyone");
+            setViewMode("everyone");
+          }}
           className="flex-1 sm:flex-initial"
         >
           Everyone Checkouts
@@ -254,6 +323,7 @@ export function CheckoutTable({ checkouts, currentUserId, userTeams = [] }: Chec
               <Button
                 variant={viewMode === "team" ? "default" : "outline"}
                 onClick={() => {
+                  goToActiveView("team");
                   setViewMode("team");
                   if (!teamFilterOpen) {
                     setTeamFilterOpen(true);
@@ -282,6 +352,7 @@ export function CheckoutTable({ checkouts, currentUserId, userTeams = [] }: Chec
                   <CommandGroup>
                     <CommandItem
                       onSelect={() => {
+                        goToActiveView("team");
                         setSelectedTeam(null);
                         setViewMode("team");
                         setTeamFilterOpen(false);
@@ -295,6 +366,7 @@ export function CheckoutTable({ checkouts, currentUserId, userTeams = [] }: Chec
                       <CommandItem
                         key={team}
                         onSelect={() => {
+                          goToActiveView("team");
                           setSelectedTeam(team);
                           setViewMode("team");
                           setTeamFilterOpen(false);
@@ -313,7 +385,10 @@ export function CheckoutTable({ checkouts, currentUserId, userTeams = [] }: Chec
         ) : (
           <Button
             variant={viewMode === "team" ? "default" : "outline"}
-            onClick={() => setViewMode("team")}
+            onClick={() => {
+              goToActiveView("team");
+              setViewMode("team");
+            }}
             className="flex-1 sm:flex-initial"
             disabled={normalizedUserTeams.length === 0}
           >
@@ -325,6 +400,13 @@ export function CheckoutTable({ checkouts, currentUserId, userTeams = [] }: Chec
             )}
           </Button>
         )}
+        <Button
+          variant={viewMode === "returned" ? "default" : "outline"}
+          onClick={goToReturnedView}
+          className="flex-1 sm:flex-initial"
+        >
+          Returned
+        </Button>
       </div>
 
       {/* Search and Filter Bar */}
@@ -438,21 +520,66 @@ export function CheckoutTable({ checkouts, currentUserId, userTeams = [] }: Chec
         </div>
       )}
 
-      {/* Results Count */}
-      <div className="text-sm text-muted-foreground">
-          {viewMode === "yours"
+      {/* Results Count and Pagination */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+        <div className="text-sm text-muted-foreground">
+          {isPaginated && totalCount != null
+            ? totalCount === 0
+              ? "Showing 0 checkouts"
+              : `Showing ${(currentPage - 1) * (pageSize ?? 10) + 1}-${Math.min(currentPage * (pageSize ?? 10), totalCount)} of ${totalCount} checkout${totalCount !== 1 ? "s" : ""}`
+            : viewMode === "yours"
             ? `Showing ${filteredAndSortedCheckouts.length} of your checkout${filteredAndSortedCheckouts.length !== 1 ? "s" : ""}`
             : viewMode === "everyone"
             ? `Showing ${filteredAndSortedCheckouts.length} checkout${filteredAndSortedCheckouts.length !== 1 ? "s" : ""}`
+            : viewMode === "returned"
+            ? `Showing ${filteredAndSortedCheckouts.length} returned checkout${filteredAndSortedCheckouts.length !== 1 ? "s" : ""}`
             : selectedTeam
             ? `Showing ${filteredAndSortedCheckouts.length} checkout${filteredAndSortedCheckouts.length !== 1 ? "s" : ""} from ${selectedTeam}`
             : `Showing ${filteredAndSortedCheckouts.length} team checkout${filteredAndSortedCheckouts.length !== 1 ? "s" : ""} from all your teams`}
+        </div>
+        {isPaginated && basePath && totalCount != null && (
+          <div className="flex items-center gap-2">
+            {currentPage > 1 ? (
+              <Button variant="outline" size="sm" asChild>
+                <Link href={buildPageUrl(currentPage - 1)}>
+                  <ChevronLeft className="mr-1 h-4 w-4" />
+                  Previous
+                </Link>
+              </Button>
+            ) : (
+              <Button variant="outline" size="sm" disabled>
+                <ChevronLeft className="mr-1 h-4 w-4" />
+                Previous
+              </Button>
+            )}
+            <span className="text-sm text-muted-foreground">
+              Page {currentPage} of {Math.max(1, Math.ceil(totalCount / (pageSize ?? 10)))}
+            </span>
+            {currentPage < Math.ceil(totalCount / (pageSize ?? 10)) ? (
+              <Button variant="outline" size="sm" asChild>
+                <Link href={buildPageUrl(currentPage + 1)}>
+                  Next
+                  <ChevronRight className="ml-1 h-4 w-4" />
+                </Link>
+              </Button>
+            ) : (
+              <Button variant="outline" size="sm" disabled>
+                Next
+                <ChevronRight className="ml-1 h-4 w-4" />
+              </Button>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Table */}
       {filteredAndSortedCheckouts.length === 0 ? (
         <div className="text-center py-12 text-muted-foreground">
-          {viewMode === "yours"
+          {isPaginated
+            ? "No checkouts on this page."
+            : viewMode === "returned"
+            ? "No returned checkouts found."
+            : viewMode === "yours"
             ? "You have no checkouts matching the selected filters."
             : viewMode === "everyone"
             ? "No checkouts found matching the selected filters."
@@ -470,7 +597,7 @@ export function CheckoutTable({ checkouts, currentUserId, userTeams = [] }: Chec
                 <TableRow>
                   <TableHead className="w-[80px] py-2">Image</TableHead>
                   <TableHead className="py-2">Item Name</TableHead>
-                  {(viewMode === "everyone" || viewMode === "team") && <TableHead className="py-2">Recipient</TableHead>}
+                  {(viewMode === "everyone" || viewMode === "team" || viewMode === "returned") && <TableHead className="py-2">Recipient</TableHead>}
                   <TableHead className="py-2">Quantity</TableHead>
                   <TableHead className="py-2">Status</TableHead>
                   <TableHead className="py-2">Checkout Date</TableHead>
@@ -480,9 +607,11 @@ export function CheckoutTable({ checkouts, currentUserId, userTeams = [] }: Chec
                 </TableRow>
               </TableHeader>
               <TableBody>
-              {/* Active Checkouts Section */}
-              {activeCheckouts.map((checkout) => (
-                <TableRow key={checkout.id}>
+              {filteredAndSortedCheckouts.map((checkout) => (
+                <TableRow
+                  key={checkout.id}
+                  className={checkout.returned_date ? "opacity-75" : undefined}
+                >
                   <TableCell className="py-2">
                     {checkout.image_URL ? (
                       <div className="relative h-12 w-12 overflow-hidden rounded-md border border-border">
@@ -499,7 +628,7 @@ export function CheckoutTable({ checkouts, currentUserId, userTeams = [] }: Chec
                     )}
                   </TableCell>
                   <TableCell className="font-medium py-2">{checkout.item_name}</TableCell>
-                  {(viewMode === "everyone" || viewMode === "team") && (
+                  {(viewMode === "everyone" || viewMode === "team" || viewMode === "returned") && (
                     <TableCell className="py-2">
                       <div className="flex items-center gap-2">
                         <User className="h-3 w-3 text-muted-foreground" />
@@ -558,83 +687,6 @@ export function CheckoutTable({ checkouts, currentUserId, userTeams = [] }: Chec
                       ) : (
                         <span className="text-xs text-muted-foreground">Returned</span>
                       )}
-                    </TableCell>
-                  )}
-                </TableRow>
-              ))}
-
-              {/* Returned Checkouts Section */}
-              {returnedCheckouts.length > 0 && activeCheckouts.length > 0 && (
-                <TableRow className="bg-muted/50">
-                  <TableCell colSpan={(viewMode === "everyone" || viewMode === "team") ? 8 : 7} className="font-semibold text-muted-foreground py-2">
-                    Returned
-                  </TableCell>
-                </TableRow>
-              )}
-              {returnedCheckouts.map((checkout) => (
-                <TableRow key={checkout.id} className="opacity-75">
-                  <TableCell className="py-2">
-                    {checkout.image_URL ? (
-                      <div className="relative h-12 w-12 overflow-hidden rounded-md border border-border">
-                        <img
-                          src={checkout.image_URL}
-                          alt={checkout.item_name}
-                          className="h-full w-full object-cover"
-                        />
-                      </div>
-                    ) : (
-                      <div className="flex h-12 w-12 items-center justify-center rounded-md border border-border bg-muted text-muted-foreground">
-                        <Package className="h-4 w-4" />
-                      </div>
-                    )}
-                  </TableCell>
-                  <TableCell className="font-medium py-2">{checkout.item_name}</TableCell>
-                  {(viewMode === "everyone" || viewMode === "team") && (
-                    <TableCell className="py-2">
-                      <div className="flex items-center gap-2">
-                        <User className="h-3 w-3 text-muted-foreground" />
-                        <span className="text-sm">{checkout.recipient_full_name}</span>
-                      </div>
-                    </TableCell>
-                  )}
-                  <TableCell className="py-2 text-sm">{checkout.quantity}</TableCell>
-                  <TableCell className="py-2">
-                    {getStatusBadge(
-                      checkout.expected_return_date,
-                      checkout.returned_date
-                    )}
-                  </TableCell>
-                  <TableCell className="py-2">
-                    <div className="flex items-center gap-1.5 text-muted-foreground">
-                      <Calendar className="h-3 w-3" />
-                      <span className="text-sm">{formatDate(checkout.sign_out_date)}</span>
-                    </div>
-                  </TableCell>
-                  <TableCell className="py-2">
-                    <div
-                      className={cn(
-                        "flex items-center gap-1.5",
-                        isOverdue(
-                          checkout.expected_return_date,
-                          checkout.returned_date
-                        )
-                          ? "text-destructive font-medium"
-                          : "text-muted-foreground"
-                      )}
-                    >
-                      <Calendar className="h-3 w-3" />
-                      <span className="text-sm">{formatDate(checkout.expected_return_date)}</span>
-                    </div>
-                  </TableCell>
-                  <TableCell className="py-2">
-                    <div className="flex items-center gap-1.5 text-muted-foreground">
-                      <Calendar className="h-3 w-3" />
-                      <span className="text-sm">{formatDate(checkout.returned_date)}</span>
-                    </div>
-                  </TableCell>
-                  {viewMode === "yours" && (
-                    <TableCell className="py-2">
-                      <span className="text-xs text-muted-foreground">Returned</span>
                     </TableCell>
                   )}
                 </TableRow>

@@ -19,16 +19,28 @@ type ItemWithTags = {
   }>;
 };
 
-export default async function ItemsPage() {
+const PAGE_SIZE = 10;
+
+type ItemsPageProps = {
+  searchParams: Promise<{ page?: string }>;
+};
+
+export default async function ItemsPage({ searchParams }: ItemsPageProps) {
   const supabase = await createClient(cookies());
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  // Fetch items with their tags
+  const resolved = await searchParams;
+  const page = Math.max(1, parseInt(resolved.page ?? "1", 10) || 1);
+  const from = (page - 1) * PAGE_SIZE;
+  const to = from + PAGE_SIZE - 1;
+
+  // Fetch items with their tags (paginated) and total count
   let items: ItemWithTags[] = [];
+  let totalCount = 0;
   if (user) {
-    const { data: itemsData, error: itemsError } = await supabase
+    const { data: itemsData, error: itemsError, count } = await supabase
       .from("items")
       .select(
         `
@@ -45,12 +57,14 @@ export default async function ItemsPage() {
           )
         )
       `,
+        { count: "exact" },
       )
       .is("deleted_at", null)
-      .order("item_name", { ascending: true });
+      .order("item_name", { ascending: true })
+      .range(from, to);
 
     if (!itemsError && itemsData) {
-      // Transform the data to flatten tags
+      totalCount = count ?? 0;
       items = itemsData.map((item: any) => ({
         id: item.id,
         item_name: item.item_name,
@@ -91,12 +105,18 @@ export default async function ItemsPage() {
           <CardTitle>All Items</CardTitle>
         </CardHeader>
         <CardContent>
-          {items.length === 0 ? (
+          {totalCount === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
               No items found in inventory.
             </div>
           ) : (
-            <InventoryTable items={items} />
+            <InventoryTable
+              items={items}
+              totalCount={totalCount}
+              currentPage={page}
+              pageSize={PAGE_SIZE}
+              basePath="/items"
+            />
           )}
         </CardContent>
       </Card>

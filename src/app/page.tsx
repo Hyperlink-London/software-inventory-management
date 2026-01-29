@@ -9,6 +9,8 @@ import { CheckoutTable } from "@/components/CheckoutTable";
 import { CollapsibleCheckoutCard } from "@/components/CollapsibleCheckoutCard";
 import { AddItemButton } from "@/components/AddItemButton";
 
+const PAGE_SIZE = 10;
+
 type ItemWithTags = {
   id: string;
   item_name: string;
@@ -22,11 +24,31 @@ type ItemWithTags = {
   }>;
 };
 
-export default async function Dashboard() {
+type DashboardProps = {
+  searchParams: Promise<{ page?: string; checkoutPage?: string; checkoutStatus?: string; checkoutView?: string }>;
+};
+
+type CheckoutView = "yours" | "everyone" | "returned";
+
+export default async function Dashboard({ searchParams }: DashboardProps) {
   const supabase = await createClient(cookies());
   const {
     data: { user },
   } = await supabase.auth.getUser();
+
+  const resolved = await searchParams;
+  const page = Math.max(1, parseInt(resolved.page ?? "1", 10) || 1);
+  const from = (page - 1) * PAGE_SIZE;
+  const to = from + PAGE_SIZE - 1;
+  const checkoutPage = Math.max(1, parseInt(resolved.checkoutPage ?? "1", 10) || 1);
+  const checkoutFrom = (checkoutPage - 1) * PAGE_SIZE;
+  const checkoutTo = checkoutFrom + PAGE_SIZE - 1;
+  const checkoutView: CheckoutView =
+    resolved.checkoutView === "yours" || resolved.checkoutView === "everyone" || resolved.checkoutView === "returned"
+      ? resolved.checkoutView
+      : resolved.checkoutStatus === "returned"
+        ? "returned"
+        : "yours";
 
   // Fetch user profile from profiles table
   let username = null;
@@ -71,10 +93,11 @@ export default async function Dashboard() {
     }
   }
 
-  // Fetch items with their tags
+  // Fetch items with their tags (paginated) and total count
   let items: ItemWithTags[] = [];
+  let totalCount = 0;
   if (user) {
-    const { data: itemsData, error: itemsError } = await supabase
+    const { data: itemsData, error: itemsError, count } = await supabase
       .from("items")
       .select(
         `
@@ -91,12 +114,14 @@ export default async function Dashboard() {
           )
         )
       `,
+        { count: "exact" },
       )
       .is("deleted_at", null)
-      .order("item_name", { ascending: true });
+      .order("item_name", { ascending: true })
+      .range(from, to);
 
     if (!itemsError && itemsData) {
-      // Transform the data to flatten tags
+      totalCount = count ?? 0;
       items = itemsData.map((item: any) => ({
         id: item.id,
         item_name: item.item_name,
@@ -130,15 +155,37 @@ type CheckoutItem = {
 };
 
   let checkouts: CheckoutItem[] = [];
+  let checkoutTotalCount = 0;
   if (user) {
-    // Try to fetch with teams first
     let checkoutsData: any[] | null = null;
     let checkoutsError: any = null;
+    let count: number | null = null;
 
-    const { data, error } = await supabase
-      .from("itemsignouts")
-      .select(
-        `
+    const applyCheckoutViewFilter = (q: any) => {
+      let query = q.is("deleted_at", null);
+      if (checkoutView === "yours" && userProfileId) {
+        query = query.eq("recipient_id", userProfileId).is("returned_date", null);
+      } else if (checkoutView === "everyone") {
+        query = query.is("returned_date", null);
+      } else if (checkoutView === "returned") {
+        query = query.not("returned_date", "is", null);
+      }
+      return query;
+      if (checkoutView === "yours" && userProfileId) {
+        query = query.eq("recipient_id", userProfileId).is("returned_date", null);
+      } else if (checkoutView === "everyone") {
+        query = query.is("returned_date", null);
+      } else if (checkoutView === "returned") {
+        query = query.not("returned_date", "is", null);
+      }
+      return query;
+    };
+
+    let checkoutQueryWithTeams = applyCheckoutViewFilter(
+      supabase
+        .from("itemsignouts")
+        .select(
+          `
         id,
         item_id,
         quantity,
@@ -156,12 +203,17 @@ type CheckoutItem = {
           teams
         )
       `,
-      )
-      .is("deleted_at", null)
-      .order("sign_out_date", { ascending: false });
+          { count: "exact" },
+        )
+    )
+      .order(checkoutView === "returned" ? "returned_date" : "sign_out_date", { ascending: false })
+      .range(checkoutFrom, checkoutTo);
+
+    const { data, error, count: countWithTeams } = await checkoutQueryWithTeams;
 
     checkoutsData = data;
     checkoutsError = error;
+    count = countWithTeams ?? null;
 
     // If error is about teams column, try without it
     if (
@@ -172,8 +224,8 @@ type CheckoutItem = {
       console.warn(
         "⚠️ Teams column not found in profiles. Fetching checkouts without teams. Please run migration: migrations/add_teams_to_profiles.sql",
       );
-      const { data: dataWithoutTeams, error: errorWithoutTeams } =
-        await supabase
+      let checkoutQueryWithoutTeams = applyCheckoutViewFilter(
+        supabase
           .from("itemsignouts")
           .select(
             `
@@ -193,15 +245,22 @@ type CheckoutItem = {
             username
           )
         `,
+            { count: "exact" },
           )
-          .is("deleted_at", null)
-          .order("sign_out_date", { ascending: false });
+      )
+        .order(checkoutView === "returned" ? "returned_date" : "sign_out_date", { ascending: false })
+        .range(checkoutFrom, checkoutTo);
+
+      const { data: dataWithoutTeams, error: errorWithoutTeams, count: countWithoutTeams } =
+        await checkoutQueryWithoutTeams;
 
       checkoutsData = dataWithoutTeams;
       checkoutsError = errorWithoutTeams;
+      count = countWithoutTeams ?? null;
     }
 
     if (!checkoutsError && checkoutsData) {
+      checkoutTotalCount = count ?? 0;
       checkouts = checkoutsData.map((checkout: any) => ({
         id: checkout.id,
         item_id: checkout.item_id,
@@ -229,6 +288,14 @@ type CheckoutItem = {
         checkouts={checkouts}
         currentUserId={userProfileId}
         userTeams={userTeams}
+        totalCount={checkoutTotalCount}
+        currentPage={checkoutPage}
+        pageSize={PAGE_SIZE}
+        basePath="/"
+        pageParam="checkoutPage"
+        initialViewMode={checkoutView}
+        viewParam="checkoutView"
+        returnViewSearchParams="checkoutView=returned"
       />
 
       <Card className="w-full">
@@ -238,7 +305,7 @@ type CheckoutItem = {
               <CardTitle className="text-base sm:text-lg">Inventory</CardTitle>
               <AddItemButton />
             </div>
-            {items.length > 0 && (
+            {totalCount > 0 && (
               <Link href="/items" className="w-full sm:w-auto">
                 <Button
                   variant="outline"
@@ -253,12 +320,20 @@ type CheckoutItem = {
           </div>
         </CardHeader>
         <CardContent className="px-3 sm:px-6">
-          {items.length === 0 ? (
+          {totalCount === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               No items found in inventory.
             </div>
           ) : (
-            <InventoryTable items={items} stickyControls maxHeight="600px" />
+            <InventoryTable
+              items={items}
+              stickyControls
+              maxHeight="600px"
+              totalCount={totalCount}
+              currentPage={page}
+              pageSize={PAGE_SIZE}
+              basePath="/"
+            />
           )}
         </CardContent>
       </Card>

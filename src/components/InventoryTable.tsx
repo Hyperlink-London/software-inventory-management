@@ -12,6 +12,8 @@ import {
   XCircle,
   ShoppingCart,
   Pencil,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -67,6 +69,11 @@ type InventoryTableProps = {
   stickyControls?: boolean;
   maxHeight?: string;
   onItemUpdate?: () => void;
+  /** When set, shows server-side pagination (e.g. /items). */
+  totalCount?: number;
+  currentPage?: number;
+  pageSize?: number;
+  basePath?: string;
 };
 
 export function InventoryTable({
@@ -74,7 +81,12 @@ export function InventoryTable({
   stickyControls = false,
   maxHeight = "none",
   onItemUpdate,
+  totalCount,
+  currentPage = 1,
+  pageSize = 10,
+  basePath,
 }: InventoryTableProps) {
+  const isPaginated = totalCount != null && basePath != null;
   const router = useRouter();
   const [localItems, setLocalItems] = React.useState<ItemWithTags[]>(items);
   const [searchQuery, setSearchQuery] = React.useState("");
@@ -337,9 +349,53 @@ export function InventoryTable({
         </div>
       )}
 
-      {/* Results Count */}
-      <div className="text-sm text-muted-foreground">
-        Showing {filteredItems.length} of {localItems.length} items
+      {/* Results Count and Pagination */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+        <div className="text-sm text-muted-foreground">
+          {isPaginated && totalCount != null
+            ? `Showing ${(currentPage - 1) * (pageSize ?? 10) + 1}-${Math.min(currentPage * (pageSize ?? 10), totalCount)} of ${totalCount} items`
+            : `Showing ${filteredItems.length} of ${localItems.length} items`}
+        </div>
+        {isPaginated && basePath && totalCount != null && (
+          <div className="flex items-center gap-2">
+            {currentPage > 1 ? (
+              <Button variant="outline" size="sm" asChild>
+                <Link
+                  href={
+                    currentPage === 2
+                      ? basePath
+                      : `${basePath}?page=${currentPage - 1}`
+                  }
+                >
+                  <ChevronLeft className="mr-1 h-4 w-4" />
+                  Previous
+                </Link>
+              </Button>
+            ) : (
+              <Button variant="outline" size="sm" disabled>
+                <ChevronLeft className="mr-1 h-4 w-4" />
+                Previous
+              </Button>
+            )}
+            <span className="text-sm text-muted-foreground">
+              Page {currentPage} of{" "}
+              {Math.max(1, Math.ceil(totalCount / (pageSize ?? 10)))}
+            </span>
+            {currentPage < Math.ceil(totalCount / (pageSize ?? 10)) ? (
+              <Button variant="outline" size="sm" asChild>
+                <Link href={`${basePath}?page=${currentPage + 1}`}>
+                  Next
+                  <ChevronRight className="ml-1 h-4 w-4" />
+                </Link>
+              </Button>
+            ) : (
+              <Button variant="outline" size="sm" disabled>
+                Next
+                <ChevronRight className="ml-1 h-4 w-4" />
+              </Button>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -463,7 +519,9 @@ export function InventoryTable({
     <>
       {filteredItems.length === 0 ? (
         <div className="text-center py-12 text-muted-foreground">
-          No items found matching your filters.
+          {isPaginated
+            ? "No items on this page."
+            : "No items found matching your filters."}
         </div>
       ) : (
         <>

@@ -21,16 +21,34 @@ type CheckoutItem = {
   recipient_id: string;
 };
 
-type CollapsibleCheckoutCardProps = {
+export type CollapsibleCheckoutCardProps = {
   checkouts: CheckoutItem[];
   currentUserId: string | null;
   userTeams?: string[];
+  /** When set with basePath, enables server-side pagination. */
+  totalCount?: number;
+  currentPage?: number;
+  pageSize?: number;
+  basePath?: string;
+  pageParam?: string;
+  /** When view is server-driven (e.g. ?checkoutView=yours). */
+  initialViewMode?: "yours" | "everyone" | "team" | "returned";
+  viewParam?: string;
+  returnViewSearchParams?: string;
 };
 
 export function CollapsibleCheckoutCard({
   checkouts,
   currentUserId,
   userTeams = [],
+  totalCount,
+  currentPage = 1,
+  pageSize = 10,
+  basePath,
+  pageParam = "page",
+  initialViewMode,
+  viewParam,
+  returnViewSearchParams,
 }: CollapsibleCheckoutCardProps) {
   const [isOpen, setIsOpen] = React.useState(true);
 
@@ -100,7 +118,17 @@ export function CollapsibleCheckoutCard({
               : "-translate-y-2 opacity-0"
           )}
         >
-          <CheckoutTable checkouts={checkouts} currentUserId={currentUserId} userTeams={userTeams} />
+          <CheckoutTable
+            checkouts={checkouts}
+            currentUserId={currentUserId}
+            userTeams={userTeams}
+            {...(totalCount != null && basePath != null
+              ? { totalCount, currentPage, pageSize, basePath, pageParam }
+              : {})}
+            {...(initialViewMode != null ? { initialViewMode } : {})}
+            {...(viewParam != null ? { viewParam } : {})}
+            {...(returnViewSearchParams != null ? { returnViewSearchParams } : {})}
+          />
         </CardContent>
       </div>
     </Card>

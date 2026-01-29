@@ -16,8 +16,8 @@ export async function checkInItem(checkoutId: string) {
     throw new Error(`Failed to check in item: ${checkinError.message}`);
   }
 
-  // Revalidate the dashboard page
   revalidatePath("/");
+  revalidatePath("/checkouts");
 
   const resultData = result[0] || result;
   return { 

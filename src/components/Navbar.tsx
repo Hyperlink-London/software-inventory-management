@@ -70,7 +70,7 @@ export default function Navbar() {
   return (
     <header
       className={cn(
-        "sticky top-0 z-50 transition-all duration-500 ease-in-out overflow-hidden",
+        "sticky top-0 z-50 transition-all duration-500 ease-in-out overflow-visible",
         isScrolled
           ? "py-2"
           : "py-3 border-b border-border"

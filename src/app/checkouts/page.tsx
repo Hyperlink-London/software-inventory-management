@@ -20,11 +20,32 @@ type CheckoutItem = {
   recipient_teams?: string[];
 };
 
-export default async function CheckoutsPage() {
+const PAGE_SIZE = 10;
+
+type CheckoutsPageProps = {
+  searchParams: Promise<{ page?: string; status?: string; view?: string }>;
+};
+
+/** Server-side view: determines which checkouts we fetch and count. */
+type CheckoutView = "yours" | "everyone" | "returned";
+
+export default async function CheckoutsPage({ searchParams }: CheckoutsPageProps) {
   const supabase = await createClient(cookies());
   const {
     data: { user },
   } = await supabase.auth.getUser();
+
+  const resolved = await searchParams;
+  const page = Math.max(1, parseInt(resolved.page ?? "1", 10) || 1);
+  const from = (page - 1) * PAGE_SIZE;
+  const to = from + PAGE_SIZE - 1;
+  // view=returned or legacy status=returned; default "yours" so your checkouts show on page 1
+  const view: CheckoutView =
+    resolved.view === "yours" || resolved.view === "everyone" || resolved.view === "returned"
+      ? resolved.view
+      : resolved.status === "returned"
+        ? "returned"
+        : "yours";
 
   // Fetch user profile ID and teams
   let userProfileId = null;
@@ -61,16 +82,31 @@ export default async function CheckoutsPage() {
     }
   }
 
-  // Fetch checkouts
+  // Fetch checkouts (paginated) filtered by view so count and data match
   let checkouts: CheckoutItem[] = [];
+  let totalCount = 0;
   if (user) {
-    // Try to fetch with teams first
     let checkoutsData: any[] | null = null;
     let checkoutsError: any = null;
-    
-    const { data, error } = await supabase
-      .from("itemsignouts")
-      .select(`
+    let count: number | null = null;
+
+    const applyViewFilter = (q: ReturnType<typeof supabase.from>) => {
+      let query = q.is("deleted_at", null);
+      if (view === "yours" && userProfileId) {
+        query = query.eq("recipient_id", userProfileId).is("returned_date", null);
+      } else if (view === "everyone") {
+        query = query.is("returned_date", null);
+      } else if (view === "returned") {
+        query = query.not("returned_date", "is", null);
+      }
+      return query;
+    };
+
+    let queryWithTeams = applyViewFilter(
+      supabase
+        .from("itemsignouts")
+        .select(
+          `
         id,
         item_id,
         quantity,
@@ -87,19 +123,27 @@ export default async function CheckoutsPage() {
           username,
           teams
         )
-      `)
-      .is("deleted_at", null)
-      .order("sign_out_date", { ascending: false });
+      `,
+          { count: "exact" },
+        )
+    )
+      .order(view === "returned" ? "returned_date" : "sign_out_date", { ascending: false })
+      .range(from, to);
+
+    const { data, error, count: countWithTeams } = await queryWithTeams;
 
     checkoutsData = data;
     checkoutsError = error;
+    count = countWithTeams ?? null;
 
     // If error is about teams column, try without it
     if (checkoutsError && checkoutsError.message?.includes("column") && checkoutsError.message?.includes("teams")) {
       console.warn("⚠️ Teams column not found in profiles. Fetching checkouts without teams. Please run migration: migrations/add_teams_to_profiles.sql");
-      const { data: dataWithoutTeams, error: errorWithoutTeams } = await supabase
-        .from("itemsignouts")
-        .select(`
+      let queryWithoutTeams = applyViewFilter(
+        supabase
+          .from("itemsignouts")
+          .select(
+            `
           id,
           item_id,
           quantity,
@@ -115,15 +159,22 @@ export default async function CheckoutsPage() {
             full_name,
             username
           )
-        `)
-        .is("deleted_at", null)
-        .order("sign_out_date", { ascending: false });
-      
+        `,
+            { count: "exact" },
+          )
+      )
+        .order(view === "returned" ? "returned_date" : "sign_out_date", { ascending: false })
+        .range(from, to);
+
+      const { data: dataWithoutTeams, error: errorWithoutTeams, count: countWithoutTeams } = await queryWithoutTeams;
+
       checkoutsData = dataWithoutTeams;
       checkoutsError = errorWithoutTeams;
+      count = countWithoutTeams ?? null;
     }
 
     if (!checkoutsError && checkoutsData) {
+      totalCount = count ?? 0;
       checkouts = checkoutsData.map((checkout: any) => ({
         id: checkout.id,
         item_id: checkout.item_id,
@@ -163,7 +214,18 @@ export default async function CheckoutsPage() {
           <CardTitle>All Checkouts</CardTitle>
         </CardHeader>
         <CardContent>
-          <CheckoutTable checkouts={checkouts} currentUserId={userProfileId} userTeams={userTeams} />
+          <CheckoutTable
+            checkouts={checkouts}
+            currentUserId={userProfileId}
+            userTeams={userTeams}
+            totalCount={totalCount}
+            currentPage={page}
+            pageSize={PAGE_SIZE}
+            basePath="/checkouts"
+            initialViewMode={view}
+            viewParam="view"
+            returnViewSearchParams="view=returned"
+          />
         </CardContent>
       </Card>
     </div>
