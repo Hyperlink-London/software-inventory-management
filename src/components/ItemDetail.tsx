@@ -9,9 +9,9 @@ import {
   XCircle,
   ShoppingCart,
   Pencil,
-  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { OptimizedPreviewImage } from "@/components/OptimizedItemImage";
 import { Badge } from "@/components/ui/badge";
 import { CheckoutDialog } from "@/components/CheckoutDialog";
 import { EditItemDialog } from "@/components/EditItemDialog";
@@ -63,7 +63,6 @@ export function ItemDetail({
   const [currentItem, setCurrentItem] = React.useState<ItemWithTags>(item);
   const [checkoutDialogOpen, setCheckoutDialogOpen] = React.useState(false);
   const [editDialogOpen, setEditDialogOpen] = React.useState(false);
-  const [imageLoading, setImageLoading] = React.useState(true);
 
   const getStatusIcon = (quantity: number) => {
     if (quantity === 0) {
@@ -167,20 +166,11 @@ export function ItemDetail({
         {/* Image section */}
         <div className="rounded-lg border p-4 flex items-center justify-center bg-muted/40">
           {currentItem.image_URL ? (
-            <div className="relative w-full min-h-[200px] flex items-center justify-center">
-              {imageLoading && (
-                <div className="absolute inset-0 flex items-center justify-center bg-muted rounded-md">
-                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                </div>
-              )}
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={currentItem.image_URL}
-                alt={currentItem.item_name}
-                className="max-h-[350px] max-w-full rounded-md object-contain"
-                onLoad={() => setImageLoading(false)}
-              />
-            </div>
+            <OptimizedPreviewImage
+              src={currentItem.image_URL}
+              alt={currentItem.item_name}
+              containerClassName="min-h-[200px] max-h-[350px]"
+            />
           ) : (
             <div className="flex h-64 w-full items-center justify-center rounded-md border border-dashed border-border bg-muted text-muted-foreground">
               <span className="text-sm">No image available</span>

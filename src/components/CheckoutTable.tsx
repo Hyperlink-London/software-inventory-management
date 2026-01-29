@@ -36,6 +36,7 @@ import {
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { checkInItem } from "@/actions/checkin/action";
+import { OptimizedItemImage, OptimizedPreviewImage } from "@/components/OptimizedItemImage";
 
 type CheckoutItem = {
   id: string;
@@ -614,10 +615,10 @@ export function CheckoutTable({
                         }}
                         className="relative h-12 w-12 overflow-hidden rounded-md border border-border focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background cursor-pointer"
                       >
-                        <img
+                        <OptimizedItemImage
                           src={checkout.image_URL}
                           alt={checkout.item_name}
-                          className="h-full w-full object-cover"
+                          size="xs"
                         />
                       </button>
                     ) : (
@@ -752,11 +753,9 @@ export function CheckoutTable({
                 <DialogTitle>{selectedImageItem.item_name}</DialogTitle>
               </DialogHeader>
               <div className="mt-2">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
+                <OptimizedPreviewImage
                   src={selectedImageItem.image_URL}
                   alt={selectedImageItem.item_name}
-                  className="max-h-[70vh] max-w-full rounded-md object-contain"
                 />
               </div>
             </>

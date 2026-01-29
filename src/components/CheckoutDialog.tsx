@@ -13,6 +13,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { OptimizedItemImage } from "@/components/OptimizedItemImage";
 
 type ItemWithTags = {
   id: string;
@@ -130,10 +131,10 @@ export function CheckoutDialog({
             <div className="flex items-center gap-4 rounded-lg border p-4">
               {item.image_URL ? (
                 <div className="relative h-16 w-16 overflow-hidden rounded-md border border-border">
-                  <img
+                  <OptimizedItemImage
                     src={item.image_URL}
                     alt={item.item_name}
-                    className="h-full w-full object-cover"
+                    size="sm"
                   />
                 </div>
               ) : (

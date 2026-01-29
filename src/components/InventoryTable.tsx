@@ -49,6 +49,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { OptimizedPreviewImage } from "@/components/OptimizedItemImage";
 
 type ItemWithTags = {
   id: string;
@@ -84,7 +85,7 @@ function ItemImage({
 }: {
   src: string;
   alt: string;
-  size?: "sm" | "md" | "lg" | "preview";
+  size?: "sm" | "md" | "lg";
   className?: string;
 }) {
   const [isLoading, setIsLoading] = React.useState(true);
@@ -92,8 +93,7 @@ function ItemImage({
   const sizeConfig = {
     sm: { container: "h-16 w-16", sizes: "64px", quality: 60 },
     md: { container: "h-20 w-20", sizes: "80px", quality: 60 },
-    lg: { container: "h-24 w-24", sizes: "96px", quality: 70 },
-    preview: { container: "w-full h-[70vh]", sizes: "(max-width: 768px) 100vw, 768px", quality: 85 },
+    lg: { container: "h-24 w-24", sizes: "96px", quality: 65 },
   };
 
   const config = sizeConfig[size];
@@ -117,39 +117,6 @@ function ItemImage({
         sizes={config.sizes}
         quality={config.quality}
         className="object-cover rounded-md"
-        onLoad={() => setIsLoading(false)}
-      />
-    </div>
-  );
-}
-
-// Preview image with loading state (object-contain for full view)
-function PreviewImage({
-  src,
-  alt,
-}: {
-  src: string;
-  alt: string;
-}) {
-  const [isLoading, setIsLoading] = React.useState(true);
-
-  // Reset loading state when src changes
-  React.useEffect(() => {
-    setIsLoading(true);
-  }, [src]);
-
-  return (
-    <div className="relative w-full min-h-[50vh] flex items-center justify-center">
-      {isLoading && (
-        <div className="absolute inset-0 flex items-center justify-center bg-muted rounded-md">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-        </div>
-      )}
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={src}
-        alt={alt}
-        className="max-h-[70vh] max-w-full rounded-md object-contain"
         onLoad={() => setIsLoading(false)}
       />
     </div>
@@ -783,7 +750,7 @@ export function InventoryTable({
                   <DialogTitle>{selectedImageItem.item_name}</DialogTitle>
                 </DialogHeader>
                 <div className="mt-2">
-                  <PreviewImage
+                  <OptimizedPreviewImage
                     src={selectedImageItem.image_URL}
                     alt={selectedImageItem.item_name}
                   />
@@ -823,7 +790,7 @@ export function InventoryTable({
                 <DialogTitle>{selectedImageItem.item_name}</DialogTitle>
               </DialogHeader>
               <div className="mt-2">
-                <PreviewImage
+                <OptimizedPreviewImage
                   src={selectedImageItem.image_URL}
                   alt={selectedImageItem.item_name}
                 />

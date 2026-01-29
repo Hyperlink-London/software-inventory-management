@@ -167,14 +167,16 @@ export function AddItemDialog({
       setIsSubmitting(true);
       const supabase = createClient();
 
-      // image upload logic
+      // image upload logic (compress before upload to reduce storage & egress)
       let image_URL = null;
       if (formData.image) {
-        const fileName = `${crypto.randomUUID()}-${formData.image.name}`;
+        const { compressImageForUpload } = await import("@/lib/compressImage");
+        const toUpload = await compressImageForUpload(formData.image);
+        const fileName = `${crypto.randomUUID()}.${toUpload.name.split(".").pop() || "webp"}`;
 
         const { data: uploadData, error: uploadError } = await supabase.storage
           .from("item-images")
-          .upload(fileName, formData.image);
+          .upload(fileName, toUpload, { contentType: toUpload.type || "image/webp" });
 
         if (uploadError) {
           toast.error("Failed to upload image");

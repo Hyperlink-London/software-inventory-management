@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/dialog";
 import { TagSelector } from "@/components/TagSelector";
 import { TagOption } from "@/hooks/useTagSelector";
+import { OptimizedItemImage } from "@/components/OptimizedItemImage";
 import { Trash2, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { createTag } from "@/actions/items/action";
@@ -215,12 +216,14 @@ export function EditItemDialog({
           }
         }
 
-        // Upload new image
-        const fileName = `${crypto.randomUUID()}-${formData.image.name}`;
+        // Upload new image (compress before upload to reduce storage & egress)
+        const { compressImageForUpload } = await import("@/lib/compressImage");
+        const toUpload = await compressImageForUpload(formData.image);
+        const fileName = `${crypto.randomUUID()}.${toUpload.name.split(".").pop() || "webp"}`;
 
         const { data: uploadData, error: uploadError } = await supabase.storage
           .from("item-images")
-          .upload(fileName, formData.image);
+          .upload(fileName, toUpload, { contentType: toUpload.type || "image/webp" });
 
         if (uploadError) {
           toast.error("Failed to upload image");
@@ -441,10 +444,11 @@ export function EditItemDialog({
             <Label htmlFor="edit-image">Image</Label>
             {formData.existingImageUrl && !formData.image && (
               <div className="mb-2">
-                <img
+                <OptimizedItemImage
                   src={formData.existingImageUrl}
                   alt={formData.name}
-                  className="h-32 w-32 object-cover rounded-md border"
+                  size="xl"
+                  className="rounded-md border"
                 />
                 <p className="text-xs text-muted-foreground mt-1">
                   Current image

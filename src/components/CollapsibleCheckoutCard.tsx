@@ -1,13 +1,11 @@
 "use client";
 
-import * as React from "react";
-import { ChevronDown, ChevronUp, ExternalLink } from "lucide-react";
+import { ExternalLink } from "lucide-react";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { CheckoutTable } from "@/components/CheckoutTable";
-import { cn } from "@/lib/utils";
 
 type CheckoutItem = {
   id: string;
@@ -53,12 +51,11 @@ export function CollapsibleCheckoutCard({
   activeCount = 0,
   overdueCount = 0,
 }: CollapsibleCheckoutCardProps) {
-  const [isOpen, setIsOpen] = React.useState(true);
   const showBadge = activeCount > 0 || overdueCount > 0;
 
   return (
     <Card>
-      <CardHeader className="cursor-pointer py-3" onClick={() => setIsOpen(!isOpen)}>
+      <CardHeader className="py-3">
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-2 text-lg">
             Checkouts
@@ -73,66 +70,25 @@ export function CollapsibleCheckoutCard({
               </span>
             )}
           </CardTitle>
-          <div className="flex items-center gap-2">
-            <Link href="/checkouts" onClick={(e) => e.stopPropagation()}>
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-8"
-              >
-                <ExternalLink className="mr-2 h-3 w-3" />
-                View All
-              </Button>
-            </Link>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8"
-              onClick={(e) => {
-                e.stopPropagation();
-                setIsOpen(!isOpen);
-              }}
-            >
-              {isOpen ? (
-                <ChevronUp className="h-4 w-4 transition-transform duration-300" />
-              ) : (
-                <ChevronDown className="h-4 w-4 transition-transform duration-300" />
-              )}
-              <span className="sr-only">Toggle checkout table</span>
+          <Link href="/checkouts">
+            <Button variant="outline" size="sm" className="h-8">
+              <ExternalLink className="mr-2 h-3 w-3" />
+              View All
             </Button>
-          </div>
+          </Link>
         </div>
       </CardHeader>
-      <div
-        className={cn(
-          "overflow-hidden transition-all duration-500 ease-in-out",
-          isOpen 
-            ? "max-h-[5000px] opacity-100" 
-            : "max-h-0 opacity-0"
-        )}
-        style={{
-          transition: "max-height 500ms ease-in-out, opacity 400ms ease-in-out",
-        }}
-      >
-        <CardContent 
-          className={cn(
-            "transition-all duration-500 ease-in-out",
-            isOpen 
-              ? "translate-y-0 opacity-100" 
-              : "-translate-y-2 opacity-0"
-          )}
-        >
-          <CheckoutTable
-            checkouts={checkouts}
-            currentUserId={currentUserId}
-            userTeams={userTeams}
-            {...(totalCount != null && basePath != null ? { totalCount, currentPage, pageSize, basePath, pageParam } : {})}
-            {...(initialViewMode != null ? { initialViewMode } : {})}
-            {...(viewParam != null ? { viewParam } : {})}
-            {...(returnViewSearchParams != null ? { returnViewSearchParams } : {})}
-          />
-        </CardContent>
-      </div>
+      <CardContent>
+        <CheckoutTable
+          checkouts={checkouts}
+          currentUserId={currentUserId}
+          userTeams={userTeams}
+          {...(totalCount != null && basePath != null ? { totalCount, currentPage, pageSize, basePath, pageParam } : {})}
+          {...(initialViewMode != null ? { initialViewMode } : {})}
+          {...(viewParam != null ? { viewParam } : {})}
+          {...(returnViewSearchParams != null ? { returnViewSearchParams } : {})}
+        />
+      </CardContent>
     </Card>
   );
 }
