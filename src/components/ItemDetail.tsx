@@ -17,8 +17,6 @@ import { EditItemDialog } from "@/components/EditItemDialog";
 import { checkoutItem } from "@/actions/checkout/action";
 import { CollapsibleCheckoutCard } from "@/components/CollapsibleCheckoutCard";
 
-import { isAdmin, getProfileID } from "@/contexts/UserContext";
-
 type ItemWithTags = {
   id: string;
   item_name: string;
@@ -62,25 +60,6 @@ export function ItemDetail({
   const [currentItem, setCurrentItem] = React.useState<ItemWithTags>(item);
   const [checkoutDialogOpen, setCheckoutDialogOpen] = React.useState(false);
   const [editDialogOpen, setEditDialogOpen] = React.useState(false);
-
-  // get Permissions
-  const [isUserAdmin, setIsUserAdmin] = React.useState(false);
-  const [profileID, setProfileID] = React.useState<String>("");
-
-  React.useEffect(() => {
-    async function checkPermissions() {
-      try {
-        const resultA = await isAdmin();
-        setIsUserAdmin(!!resultA); // guarantees boolean
-      } catch (e) {
-        console.error("Failed to check admin:", e);
-        setIsUserAdmin(false);
-      }
-      const resultID = await getProfileID();
-      setProfileID(resultID);
-    }
-    checkPermissions();
-  }, []);
 
   const getStatusIcon = (quantity: number) => {
     if (quantity === 0) {
@@ -159,16 +138,14 @@ export function ItemDetail({
         </div>
 
         <div className="flex gap-2 flex-wrap">
-          {(isUserAdmin || profileID == item.created_by) && (
-            <Button
-              variant="outline"
-              onClick={() => setEditDialogOpen(true)}
-              className="h-9"
-            >
-              <Pencil className="mr-2 h-4 w-4" />
-              Edit
-            </Button>
-          )}
+          <Button
+            variant="outline"
+            onClick={() => setEditDialogOpen(true)}
+            className="h-9"
+          >
+            <Pencil className="mr-2 h-4 w-4" />
+            Edit
+          </Button>
           <Button
             variant="outline"
             onClick={() => setCheckoutDialogOpen(true)}
