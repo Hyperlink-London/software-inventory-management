@@ -131,7 +131,7 @@ export async function deleteItem(id: ItemId) {
 
     // Don't fail the entire deletion if signouts deletion fails
     void signoutDeleteError;
-
+``
     return { id, deleted: true } as const;
   } catch (error) {
     throw new Error(`Failed to delete item: ${error instanceof Error ? error.message : "Unknown error"}`);

@@ -171,21 +171,22 @@ export default async function Dashboard({ searchParams }: DashboardProps) {
   let activeCount = 0;
   let overdueCount = 0;
   if (user) {
-    const now = new Date().toISOString();
-    const { count: nonReturnedCount } = await supabase
+    // Fetch all non-returned checkouts and compute overdue/active in JS (match CheckoutTable isOverdue logic)
+    const now = new Date();
+    const { data: nonReturnedRows } = await supabase
       .from("itemsignouts")
-      .select("id", { count: "exact", head: true })
+      .select("id, expected_return_date")
       .is("deleted_at", null)
       .is("returned_date", null);
-    const { count: overdueCountRes } = await supabase
-      .from("itemsignouts")
-      .select("id", { count: "exact", head: true })
-      .is("deleted_at", null)
-      .is("returned_date", null)
-      .not("expected_return_date", "is", null)
-      .lt("expected_return_date", now);
-    activeCount = Math.max(0, (nonReturnedCount ?? 0) - (overdueCountRes ?? 0));
-    overdueCount = overdueCountRes ?? 0;
+    const total = nonReturnedRows?.length ?? 0;
+    overdueCount =
+      nonReturnedRows?.filter((r) => {
+        const expected = r?.expected_return_date ?? (r as Record<string, unknown>)?.expectedReturnDate;
+        if (expected == null) return false;
+        const d = new Date(expected as string);
+        return !Number.isNaN(d.getTime()) && d < now;
+      }).length ?? 0;
+    activeCount = Math.max(0, total - overdueCount);
 
     const applyCheckoutViewFilter = (q: any) => {
       let query = q.is("deleted_at", null);
@@ -219,7 +220,7 @@ export default async function Dashboard({ searchParams }: DashboardProps) {
           item_name,
           image_URL
         ),
-        profiles(
+        recipient:profiles!itemsignouts_recipient_id_fkey(
           full_name,
           username,
           teams
@@ -251,7 +252,7 @@ export default async function Dashboard({ searchParams }: DashboardProps) {
             item_name,
             image_URL
           ),
-          profiles(
+          recipient:profiles!itemsignouts_recipient_id_fkey(
             full_name,
             username
           )
@@ -277,9 +278,9 @@ export default async function Dashboard({ searchParams }: DashboardProps) {
         sign_out_date: checkout.sign_out_date,
         expected_return_date: checkout.expected_return_date,
         returned_date: checkout.returned_date,
-        recipient_full_name: checkout.profiles?.full_name || checkout.profiles?.username || "Unknown",
+        recipient_full_name: checkout.recipient?.full_name || checkout.recipient?.username || "Unknown",
         recipient_id: checkout.recipient_id,
-        recipient_teams: checkout.profiles?.teams || [],
+        recipient_teams: checkout.recipient?.teams || [],
       }));
     }
   }

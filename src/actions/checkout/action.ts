@@ -13,7 +13,7 @@ export type CheckoutInput = {
 export async function checkoutItem(input: CheckoutInput) {
   const supabase = await createClient(cookies());
   
-  // Use RPC function to checkout item - automatically handles user ID and quantity updates
+    // Use RPC function to checkout item - automatically handles user ID and quantity updates
   const { data: checkout, error: checkoutError } = await supabase.rpc("checkout_item", {
     p_item_id: input.item_id,
     p_quantity: input.quantity,
