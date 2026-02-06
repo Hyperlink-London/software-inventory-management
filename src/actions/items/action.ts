@@ -99,7 +99,7 @@ export async function deleteItem(id: ItemId) {
   const supabase = await createClient(cookies());
 
   try {
-    // Get the item to retrieve its image URL
+    // Get the item to retrieve its image URL before RPC clears it
     const { data: itemData, error: fetchError } = await supabase
       .from("items")
       .select("image_URL")
@@ -113,47 +113,26 @@ export async function deleteItem(id: ItemId) {
     // Delete image from storage if it exists using RPC (same as update flow)
     if (itemData?.image_URL) {
       try {
-        const { data: deleteResult, error: deleteError } = await supabase.rpc("delete_image_from_storage", {
-          p_image_url: itemData.image_URL
+        await supabase.rpc("delete_image_from_storage", {
+          p_image_url: itemData.image_URL,
         });
-        
-        // Continue with item deletion even if image deletion fails
-        void deleteError;
-        void deleteResult;
       } catch {
         // Continue with item deletion even if image deletion fails
       }
     }
 
-    // Soft delete the item and clear image URL
-    const { error: deleteError } = await supabase
-      .from("items")
-      .update({ deleted_at: new Date().toISOString(), image_URL: null })
-      .eq("id", id);
+    const { data: result, error: rpcError } = await supabase.rpc("delete_item", {
+      p_item_id: id,
+    });
 
-    if (deleteError) {
-      throw new Error(`Failed to delete item: ${deleteError.message}`);
+    if (rpcError) {
+      throw new Error(`Failed to delete item: ${rpcError.message}`);
     }
 
-    // Soft delete related itemtags
-    const { error: tagDeleteError } = await supabase
-      .from("itemtags")
-      .update({ deleted_at: new Date().toISOString() })
-      .eq("item_id", id)
-      .is("deleted_at", null);
-
-    // Don't fail the entire deletion if tags deletion fails
-    void tagDeleteError;
-
-    // Soft delete related itemsignouts
-    const { error: signoutDeleteError } = await supabase
-      .from("itemsignouts")
-      .update({ deleted_at: new Date().toISOString() })
-      .eq("item_id", id)
-      .is("deleted_at", null);
-
-    // Don't fail the entire deletion if signouts deletion fails
-    void signoutDeleteError;
+    const row = Array.isArray(result) ? result[0] : result;
+    if (!row?.success) {
+      throw new Error(row?.message ?? "Failed to delete item");
+    }
 
     return { id, deleted: true } as const;
   } catch (error) {
