@@ -20,6 +20,7 @@ import {
   ShoppingCart,
   UserRound,
 } from "lucide-react";
+import { NotificationBell } from "@/components/NotificationBell";
 
 export default function Navbar() {
   const { user } = useUser();
@@ -152,7 +153,9 @@ export default function Navbar() {
                 </div>
               </div>
 
-              {/* Mobile: Popover dropdown with all links */}
+              {/* Mobile: Bell + Popover dropdown with all links */}
+              <div className="flex items-center gap-1">
+                <NotificationBell />
               <Popover open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
                 <PopoverTrigger asChild>
                   <Button
@@ -227,6 +230,7 @@ export default function Navbar() {
                   </div>
                 </PopoverContent>
               </Popover>
+              </div>
             </>
           )}
         </div>

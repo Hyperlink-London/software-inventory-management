@@ -61,6 +61,29 @@ export async function createItem(input: CreateItemInput) {
     throw new Error("Failed to create item: Invalid response");
   }
 
+  // Notify teammates (inbox + push) - fire and forget
+  try {
+    const { notifyTeammates } = await import("@/lib/notifications");
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user?.id) {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("full_name, username")
+        .eq("supabase_uid", user.id)
+        .single();
+      const actorName = (profile as any)?.full_name || (profile as any)?.username || "A teammate";
+      const itemName = (item as any)?.item_name ?? input.name ?? "an item";
+      await notifyTeammates({
+        type: "team_item_added",
+        title: "New item added",
+        body: `${actorName} added "${itemName}" to the inventory`,
+        metadata: { item_id: item.id },
+      });
+    }
+  } catch {
+    // Non-fatal
+  }
+
   return item;
 }
 

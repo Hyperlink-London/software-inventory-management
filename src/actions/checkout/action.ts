@@ -3,6 +3,7 @@
 import { cookies } from "next/headers";
 import { createClient } from "@/utils/supabase/server";
 import { revalidatePath } from "next/cache";
+import { notifyTeammates } from "@/lib/notifications";
 
 export type CheckoutInput = {
   item_id: string;
@@ -24,9 +25,37 @@ export async function checkoutItem(input: CheckoutInput) {
     throw new Error(`Failed to checkout item: ${checkoutError.message}`);
   }
 
-  // Revalidate the dashboard page
+  const result = checkout[0] || checkout;
+
+  // Notify teammates (inbox + push) - fire and forget
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user?.id) {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("full_name, username")
+        .eq("supabase_uid", user.id)
+        .single();
+      const actorName = (profile as any)?.full_name || (profile as any)?.username || "A teammate";
+      const { data: item } = await supabase
+        .from("items")
+        .select("item_name")
+        .eq("id", input.item_id)
+        .single();
+      const itemName = (item as any)?.item_name ?? "an item";
+      await notifyTeammates({
+        type: "team_checkout",
+        title: "Team checkout",
+        body: `${actorName} checked out "${itemName}"`,
+        metadata: { item_id: input.item_id, checkout_id: result?.id ?? null },
+      });
+    }
+  } catch {
+    // Non-fatal
+  }
+
   revalidatePath("/");
 
-  return checkout[0] || checkout;
+  return result;
 }
 
