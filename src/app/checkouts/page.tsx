@@ -1,5 +1,6 @@
 import { createClient } from "@/utils/supabase/server";
 import { cookies } from "next/headers";
+import { ensureOverdueNotifications } from "@/lib/notifications";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { CheckoutTable } from "@/components/CheckoutTable";
@@ -95,6 +96,8 @@ export default async function CheckoutsPage({ searchParams }: CheckoutsPageProps
   let checkouts: CheckoutItem[] = [];
   let totalCount = 0;
   if (user) {
+    await ensureOverdueNotifications(userProfileId ?? null);
+
     const now = new Date().toISOString();
     const { count: nonReturnedCount } = await supabase
       .from("itemsignouts")

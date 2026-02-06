@@ -1,5 +1,7 @@
 -- Notifications and push tokens for synced web + app notifications
--- Run in Supabase SQL Editor
+--
+-- IMPORTANT: Run this in Supabase Dashboard → SQL Editor
+-- Your current schema does NOT include these tables - notifications will not work until you run this.
 
 -- 1. Push tokens table (Expo push tokens per profile/device)
 CREATE TABLE IF NOT EXISTS public.push_tokens (

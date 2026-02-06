@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { Package, ShoppingCart, Bell } from "lucide-react";
+import { Package, ShoppingCart, Bell, AlertTriangle, CalendarClock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -16,6 +16,9 @@ import { cn } from "@/lib/utils";
 const typeIcons: Record<string, React.ReactNode> = {
   team_checkout: <ShoppingCart className="h-4 w-4" />,
   team_item_added: <Package className="h-4 w-4" />,
+  overdue: <AlertTriangle className="h-4 w-4" />,
+  overdue_reminder: <AlertTriangle className="h-4 w-4" />,
+  due_tomorrow: <CalendarClock className="h-4 w-4" />,
 };
 
 function formatTimeAgo(dateStr: string): string {

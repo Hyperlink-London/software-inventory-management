@@ -1,5 +1,6 @@
 import { createClient } from "@/utils/supabase/server";
 import { cookies } from "next/headers";
+import { ensureOverdueNotifications } from "@/lib/notifications";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -85,6 +86,11 @@ export default async function Dashboard({ searchParams }: DashboardProps) {
     resolved.checkoutView === "yours" || resolved.checkoutView === "everyone" || resolved.checkoutView === "returned"
       ? resolved.checkoutView
       : "yours";
+
+  // Ensure overdue/due-tomorrow notifications exist for user's checkouts
+  if (user && userProfileId) {
+    await ensureOverdueNotifications(userProfileId);
+  }
 
   // Fetch items with their tags
   let items: ItemWithTags[] = [];
