@@ -181,7 +181,7 @@ function NotificationRow({
 }) {
   const isUnread = !notification.read_at;
   const icon = typeIcons[notification.type] ?? <Bell className="h-4 w-4" />;
-  const itemId = (notification.metadata?.item_id as string) | undefined;
+  const itemId = notification.metadata?.item_id as string | undefined;
 
   return (
     <div
