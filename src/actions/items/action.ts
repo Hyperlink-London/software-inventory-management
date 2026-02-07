@@ -76,6 +76,12 @@ export async function deleteItem(id: ItemId) {
   const supabase = await createClient(cookies());
 
   try {
+    // Ensure session is loaded from cookies so auth.uid() is set for RLS
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      throw new Error("You must be logged in to delete items");
+    }
+
     // Get the item to retrieve its image URL
     const { data: itemData, error: fetchError } = await supabase
       .from("items")
@@ -93,8 +99,6 @@ export async function deleteItem(id: ItemId) {
         const { data: deleteResult, error: deleteError } = await supabase.rpc("delete_image_from_storage", {
           p_image_url: itemData.image_URL
         });
-        
-        // Continue with item deletion even if image deletion fails
         void deleteError;
         void deleteResult;
       } catch {
@@ -102,35 +106,19 @@ export async function deleteItem(id: ItemId) {
       }
     }
 
-    // Soft delete the item and clear image URL
-    const { error: deleteError } = await supabase
-      .from("items")
-      .update({ deleted_at: new Date().toISOString(), image_URL: null })
-      .eq("id", id);
+    // Use delete_item RPC (SECURITY DEFINER) - validates creator, soft-deletes item/itemtags/itemsignouts
+    const { data: deleteResult, error: deleteError } = await supabase.rpc("delete_item", {
+      p_item_id: id
+    });
 
     if (deleteError) {
       throw new Error(`Failed to delete item: ${deleteError.message}`);
     }
 
-    // Soft delete related itemtags
-    const { error: tagDeleteError } = await supabase
-      .from("itemtags")
-      .update({ deleted_at: new Date().toISOString() })
-      .eq("item_id", id)
-      .is("deleted_at", null);
-
-    // Don't fail the entire deletion if tags deletion fails
-    void tagDeleteError;
-
-    // Soft delete related itemsignouts
-    const { error: signoutDeleteError } = await supabase
-      .from("itemsignouts")
-      .update({ deleted_at: new Date().toISOString() })
-      .eq("item_id", id)
-      .is("deleted_at", null);
-
-    // Don't fail the entire deletion if signouts deletion fails
-    void signoutDeleteError;
+    const result = Array.isArray(deleteResult) ? deleteResult[0] : deleteResult;
+    if (result && !result.success) {
+      throw new Error(result.message ?? "Failed to delete item");
+    }
 ``
     return { id, deleted: true } as const;
   } catch (error) {
