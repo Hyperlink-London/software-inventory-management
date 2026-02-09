@@ -109,15 +109,17 @@ export async function ensureOverdueNotifications(profileId: string | null): Prom
     .not("expected_return_date", "is", null)
     .is("deleted_at", null);
 
-  const validCheckouts = (checkouts || []).filter(
-    (c: any) => c.items && !c.items.deleted_at
-  );
+  const validCheckouts = (checkouts || []).filter((c: any) => {
+    const item = Array.isArray(c.items) ? c.items[0] : c.items;
+    return item && !item.deleted_at;
+  });
 
   const toInsert: { type: "overdue" | "due_tomorrow"; checkout: any }[] = [];
 
   for (const c of validCheckouts) {
     const expected = c.expected_return_date;
-    const itemName = c.items?.item_name ?? "Item";
+    const item = Array.isArray(c.items) ? c.items[0] : c.items;
+    const itemName = item?.item_name ?? "Item";
 
     if (expected < todayStr) {
       const { data: existing } = await supabase
