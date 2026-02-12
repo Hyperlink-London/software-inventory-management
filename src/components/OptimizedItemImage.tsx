@@ -42,10 +42,12 @@ export function OptimizedPreviewImage({
   src,
   alt,
   containerClassName,
+  objectFit = "contain",
 }: {
   src: string;
   alt: string;
   containerClassName?: string;
+  objectFit?: "contain" | "cover";
 }) {
   const [loading, setLoading] = React.useState(true);
   React.useEffect(() => setLoading(true), [src]);
@@ -65,9 +67,12 @@ export function OptimizedPreviewImage({
         src={src}
         alt={alt}
         fill
-        sizes="(max-width: 768px) 100vw, 768px"
+        sizes="(max-width: 768px) 100vw, 50vw"
         quality={75}
-        className="object-contain rounded-md"
+        className={cn(
+          "rounded-md",
+          objectFit === "cover" ? "object-cover" : "object-contain"
+        )}
         onLoad={() => setLoading(false)}
       />
     </div>

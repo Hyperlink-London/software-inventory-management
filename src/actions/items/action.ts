@@ -191,4 +191,27 @@ export async function createTag(input: CreateTagInput) {
   return tag;
 }
 
+/**
+ * Delete a tag (soft-delete). Only succeeds if the current user is an admin
+ * (profile.teams includes "admin"). Uses RPC delete_tag in the database.
+ */
+export async function deleteTag(tagId: string) {
+  const supabase = await createClient(cookies());
+  const { data, error } = await supabase.rpc("delete_tag", {
+    p_tag_id: tagId,
+  });
+
+  if (error) {
+    throw new Error(error.message || "Failed to delete tag");
+  }
+
+  const row = Array.isArray(data) ? data[0] : data;
+  const success = (row as { success?: boolean })?.success === true;
+  const message = (row as { message?: string })?.message;
+
+  if (!success) {
+    throw new Error(message || "Failed to delete tag");
+  }
+}
+
 

@@ -17,8 +17,8 @@ import {
   ChevronDown,
   LayoutDashboard,
   Package,
+  Settings,
   ShoppingCart,
-  UserRound,
 } from "lucide-react";
 import { NotificationBell } from "@/components/NotificationBell";
 
@@ -142,9 +142,9 @@ export default function Navbar() {
                       asChild
                       className="justify-start w-full"
                     >
-                      <Link href="/profile">
-                        <UserRound className="mr-2 h-4 w-4" />
-                        Profile
+                      <Link href="/settings">
+                        <Settings className="mr-2 h-4 w-4" />
+                        Settings
                       </Link>
                     </Button>
                     <div className="border-t border-border my-1" />
@@ -194,9 +194,9 @@ export default function Navbar() {
                       className="justify-start w-full"
                       onClick={() => setMobileMenuOpen(false)}
                     >
-                      <Link href="/profile">
-                        <UserRound className="mr-2 h-4 w-4" />
-                        Profile
+                      <Link href="/settings">
+                        <Settings className="mr-2 h-4 w-4" />
+                        Settings
                       </Link>
                     </Button>
                     <Button

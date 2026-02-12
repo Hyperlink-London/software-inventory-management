@@ -163,13 +163,14 @@ export function ItemDetail({
 
       {/* Main content */}
       <div className="grid gap-6 md:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
-        {/* Image section */}
-        <div className="rounded-lg border p-4 flex items-center justify-center bg-muted/40">
+        {/* Image section - fills column so image can scale up */}
+        <div className="rounded-lg border p-4 flex items-center justify-center bg-muted/40 min-h-[320px] aspect-square w-full overflow-hidden max-md:aspect-auto max-md:min-h-[280px]">
           {currentItem.image_URL ? (
             <OptimizedPreviewImage
               src={currentItem.image_URL}
               alt={currentItem.item_name}
-              containerClassName="min-h-[200px] max-h-[350px]"
+              containerClassName="w-full h-full min-h-[280px]"
+              objectFit="cover"
             />
           ) : (
             <div className="flex h-64 w-full items-center justify-center rounded-md border border-dashed border-border bg-muted text-muted-foreground">
